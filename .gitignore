@@ -8,6 +8,7 @@ venv/
 # Python bytecode cache
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # Saved chat histories (generated at runtime)
 history/

@@ -3,3 +3,5 @@ python-dotenv>=1.0
 # New Google Gen AI SDK ("from google import genai").
 # Not the deprecated google-generativeai package.
 google-genai>=2.0,<3
+# Tests
+pytest>=8.0
