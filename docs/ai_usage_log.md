@@ -8,3 +8,4 @@ Running log for the README section "Use of coding assistants". Tool: Claude Code
 | 2026-10-31 | Write an exploration script and summarize data quirks | Which quirks matter and how to handle them (see `docs/data_exploration.md`) |
 | 2026-10-31 | Compare Gemini vs OpenAI; set up the SDK and a key smoke test | Gemini free tier (zero cost for me and reviewers), using the new `google-genai` SDK instead of the deprecated `google-generativeai` |
 | 2026-10-31 | Write `src/data_loader.py` and its pytest tests | Load everything in memory with pandas; normalize text/phones/emails at load time |
+| 2026-10-31 | Write product tools (`search_products`, `get_product_details`) and tests | Scope for the session (orders/policies left for Monday); price filters use the final price |
