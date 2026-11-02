@@ -66,7 +66,7 @@ To reproduce the return scenarios of the examples:
 python -m src.main --show-tools --today 2026-02-20
 ```
 
-Run the tests (no API key needed, the tools are tested without the LLM):
+Run the tests (no API key needed: the tools are tested directly and the agent loop with a fake model):
 
 ```bash
 python -m pytest -q
@@ -127,7 +127,7 @@ return policy).
 │   ├── tools.py               # data tools (products, orders, tickets) over pandas
 │   ├── policies.py            # policy lookup by topic
 │   └── data_loader.py         # loads and cleans the CSVs once
-├── tests/                     # pytest tests for every tool (no LLM involved)
+├── tests/                     # pytest: every tool, plus the agent loop with a fake model (no API calls)
 ├── examples/                  # 5 example conversations recorded from real runs
 ├── scripts/
 │   ├── check_gemini.py        # smoke test for the API key and model
@@ -164,6 +164,11 @@ purpose**, so every step (tool requested → executed → result returned) is ex
 - **CSVs → pandas in memory.** Under 200 rows in total; a database or a SQL agent would be overkill. Data is
   loaded and cleaned once (`src/data_loader.py`): JSON specs parsed, accent-free search text, normalized e-mails and
   phones, parsed dates.
+- **Keyword search tuned on the real data.** I measured which customer-style queries failed and fixed only those:
+  words that exist only in the specs are added to the search text (3 steel-string guitars never say "aço", 2 with a
+  pickup never say "eletroacústico"); words match at the **start** of a word, so "aço" no longer matches "braço"
+  ("braco" without accents) while "baixo" still matches "baixos"; "-ões" plurals match "-ão"; spelled-out numbers
+  become digits ("sete cordas" → "7 cordas"); filler words ("de", "com", "até", "cordas") are ignored.
 - **Policies → `get_policy(topic)` over a Markdown file split by topic.** The manual is 8 pages. Embeddings and a
   vector store would add moving parts and make retrieval fuzzy, while a fixed list of topics (sent to the model as
   an `enum`) makes it explicit **when** the agent consults policies, which is one of the challenge's goals.
@@ -194,7 +199,8 @@ unsure. Key points:
   prompt now forbids claiming any action without calling the matching tool, and `create_support_ticket` gives it a
   real way to register requests.
 - **Current date and time** are injected every turn, so the agent knows if the store is open (policy 7.1: outside
-  business hours, tell the customer when the team is back).
+  business hours, tell the customer when the team is back). They use the **store's time zone**
+  (`America/Campo_Grande`, UTC-4), not the clock of whatever machine runs the agent.
 - **Escalation:** complaints, unclear cases or anything needing a human decision → offer a support ticket
   (reply within 24 business hours) and the WhatsApp number.
 - **Out of scope:** the store sells instruments only. For accessories the agent explains this and **asks** if the
@@ -286,12 +292,15 @@ with a short context line in English; the conversation itself is in Portuguese.
 - **LLM variability.** Even with tools and a low temperature, the lite model sometimes phrases things imprecisely
   (e.g. it occasionally says "o sistema" although the prompt asks it not to). Business rules are protected by
   computing them in code, but wording is not deterministic.
-- **No automated evaluation of the agent's answers.** The tools have unit tests (38), but the agent's end-to-end
-  behaviour was checked by running scenarios and reading the transcripts.
-- **Simple keyword search.** Every word of the query must appear in the product's text (accents and case ignored).
-  There are no synonyms or typo tolerance; the model has to rephrase the query or filter by category instead.
+- **No automated evaluation of the agent's answers.** There are 53 tests (every tool, plus the function-calling loop
+  with a fake model: tool results sent back, API errors rolled back, round limit), but what the real model *says*
+  was checked by running scenarios and reading the transcripts.
+- **Keyword search, not semantic search.** Every meaningful word of the query must start a word in the product's
+  text. There is no typo tolerance and only the few normalizations described above; for anything else the model has
+  to rephrase the query or filter by category.
 - **Support tickets are a local file** (`history/tickets.jsonl`), not a real helpdesk. Nobody actually receives them.
-- **Opening hours** use the machine's local time, not Campo Grande's time zone, and the agent doesn't know holidays.
+- **Holidays are unknown:** opening hours follow Campo Grande's time zone, but the agent doesn't know which days are
+  holidays (when the store is closed).
 - **Conversation history is saved but not reloaded:** each run starts a new conversation.
 - **Identity check is basic** (no limit on attempts, no one-time code).
 - **Policies were transcribed by hand:** if the manual changes, `data/policies.md` must be updated.
@@ -301,11 +310,11 @@ with a short context line in English; the conversation itself is in Portuguese.
 - **Evaluation set:** scripted scenarios (prices, promotions, returns, out of scope) run automatically against the
   agent, with assertions on which tools were called plus an LLM-as-judge for tone and grounding.
 - **Real channel:** WhatsApp or web chat integration, and tickets going to a real helpdesk with human handoff.
-- **Better search:** synonyms ("violão eletroacústico" ↔ "Elétrico"), typo tolerance, or embeddings if the catalog
-  grows to the "300+ instruments" the manual mentions.
+- **Better search:** typo tolerance, a real synonym list, or embeddings if the catalog grows to the
+  "300+ instruments" the manual mentions.
 - **Policies:** if the manual grew large or changed often, chunk it and use embeddings (RAG) instead of fixed topics.
 - **Data layer:** SQLite or a real database instead of CSVs, with real delivery dates and dated promotions.
-- **Operations:** structured logging of tool calls and latency, time zone and holiday calendar, rate limiting for
+- **Operations:** structured logging of tool calls and latency, a holiday calendar, rate limiting for
   identity checks, resuming conversations from `history/`.
 
 ## Use of AI coding assistants

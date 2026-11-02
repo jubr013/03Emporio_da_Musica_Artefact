@@ -44,6 +44,17 @@ Decisions taken during development. They feed the "Design decisions" and "Assump
    while recording the examples. The lite model has its own quota, answered correctly in a test conversation
    (tools, expired promotion, installments) and is faster. Switching back is one line in `.env`.
 
+## Final improvements (decided 2026-11-02)
+
+1. **Search tuned on measured failures.** I ran customer-style queries against the catalog and fixed only what failed:
+   spec-derived keywords in the search text ("aco", "nylon", "eletroacustico"), word-start matching instead of
+   substring ("aco" was matching "braco"), "-ões" → "-ão", spelled-out numbers → digits, and filler words ignored.
+2. **Store time zone.** Dates and times use `America/Campo_Grande` (UTC-4) instead of the machine's clock, so opening
+   hours are right wherever the agent runs. `tzdata` was added because Windows has no built-in time zone database.
+3. **Agent loop tests with a fake model.** `Agent` accepts an injected client; tests script the model's responses with
+   the SDK's real types and check that tool results go back with the right id, API errors roll back the turn, and the
+   round limit holds. No API key or quota needed.
+
 ## Policy manual inconsistencies (resolved in `data/policies.md`)
 
 - Phone: (67) 3341-4444 used as landline, (67) 3321-4500 as WhatsApp (as section 7 names it).

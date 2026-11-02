@@ -18,3 +18,5 @@ Running log for the README section "Use of coding assistants". Tool: Claude Code
 | 2026-11-02 | Run the 5 example scenarios through the real CLI, diagnose the 429 quota error, review each transcript | Switch to `gemini-3.5-flash-lite`; which scenarios to show |
 | 2026-11-02 | AI caught a wrong purchase date in one transcript and traced it to the tool output | Add `starts_on` to each deadline and re-record that conversation instead of editing it |
 | 2026-11-02 | Draft the full README from `docs/` (decisions, data notes, this log) | Reviewed the content; assumptions and limitations reflect my choices |
+| 2026-11-02 | Suggest what to improve with the extra day, with cost and risk | Picked agent loop tests, store time zone and search improvements; skipped UI and RAG |
+| 2026-11-02 | Measure failing searches and fix them; tests caught "aço" matching "braço" | Fix only measured failures, keep keyword search |
