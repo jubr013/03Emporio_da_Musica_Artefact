@@ -8,34 +8,30 @@
 
 **Cliente:** Boa tarde! Comprei um violão Taylor aí e me arrependi, quero devolver. Pedido 6, meu email é gabriel@gmail.com
 
-> 🔧 `get_order_status(order_id=6, email='gabriel@gmail.com')`
+> 🔧 `get_order_status(email='gabriel@gmail.com', order_id=6)`
 
-> 🔧 `get_policy(topic='trocas_e_devolucoes')`
+**melodIA:** Opa, Gabriel, tudo bem? 
 
-**melodIA:** Boa tarde, Gabriel! Tudo bem?
+Olha só, não encontrei nenhum pedido de número 6 com esse e-mail (gabriel@gmail.com) por aqui. 
 
-Olha, tentei localizar o seu pedido número 6 com o e-mail `gabriel@gmail.com`, mas o sistema não encontrou nenhum registro com esses dados. 
-
-Você poderia conferir se o número do pedido ou o e-mail estão certinhos? Assim que confirmar, já olho tudo para você!
+Você poderia conferir se o número do pedido e o e-mail cadastrados na compra são esses mesmos? Assim que confirmar, dou uma olhada rápida para a gente resolver isso!
 
 **Cliente:** Ah, desculpa, usei meu telefone: (67) 98654-3210
 
 > 🔧 `get_order_status(phone='(67) 98654-3210', order_id=6)`
 
-**melodIA:** Gabriel, achei o seu pedido aqui! A previsão de entrega era 01/02/2026. Você recebeu por volta dessa data mesmo?
+**melodIA:** Gabriel, achei o pedido aqui! A previsão de entrega era para o dia 01/02/2026. Você recebeu por volta dessa data mesmo?
 
-Dá uma olhadinha no prazo de devolução por arrependimento (que é de 7 dias corridos após o recebimento, conforme a nossa política): infelizmente, o prazo encerrou em 08/02/2026. 
+Sobre a devolução por arrependimento, o prazo de 7 dias previsto em nossa política era até 08/02/2026, então já passou desse período, infelizmente. 
 
-Como já passou esse período, a devolução por arrependimento não é mais possível. Mas fica tranquilo que o seu violão (Taylor 214ce) ainda está coberto pela garantia legal de 90 dias a partir da data de recebimento, caso apareça qualquer defeito de fabricação, beleza?
-
-Se precisar de mais alguma ajuda, é só me chamar!
+Mas me conta: o violão Taylor 214ce apresentou algum problema ou defeito? Se for questão de defeito, a garantia legal de 90 dias vai até 02/05/2026. Quer que eu abra uma solicitação para a equipe verificar a garantia para você?
 
 **Cliente:** Poxa. E se ele apresentar algum defeito, como fica?
 
-**melodIA:** Fica tranquilo, Gabriel! 
+> 🔧 `get_policy(topic='garantia')`
 
-Como você recebeu o seu Taylor 214ce no dia 01/02/2026, ele está dentro da **garantia legal de 90 dias** (o prazo vai até 02/05/2026). 
+**melodIA:** Se o violão apresentar algum defeito de fabricação, você está coberto pela garantia legal de 90 dias (contados a partir do recebimento), que no seu caso vai até 02/05/2026. Além disso, muitos fabricantes oferecem garantia própria que pode variar de 6 meses a 2 anos (essas informações e condições vêm no certificado que acompanha o instrumento).
 
-Se aparecer qualquer defeito de fabricação nesse período, é só entrar em contato com a gente. A gente te ajuda a acionar a garantia ou o suporte necessário, tá bom? 
+Vale lembrar que a garantia cobre defeitos de fabricação, mas não abrange desgaste natural (como cordas e trastes), danos por mau uso, quedas ou reparos feitos por terceiros não autorizados, beleza?
 
-Lembrando que a garantia cobre defeitos de fábrica, mas não vale para danos por mau uso, quedas ou umidade, beleza? Se precisar de qualquer coisa, estou por aqui!
+Se notar qualquer probleminha técnico no Taylor 214ce nesse período, é só me chamar por aqui ou entrar em contato com a nossa equipe que a gente te ajuda com o processo!

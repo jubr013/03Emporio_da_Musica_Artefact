@@ -12,33 +12,35 @@
 
 > 🔧 `get_policy(topic='horarios')`
 
-**melodIA:** Oi! Tudo bem?
+**melodIA:** Oi! 
 
-A nossa loja fica na **Rua 14 de Maio, 3200 — Centro, Campo Grande - MS**. 
+Nossa loja fica na **Rua 14 de Maio, 3200 — Centro, Campo Grande/MS**.
 
-Aos sábados, nós abrimos das **09:00 às 13:00**. 
+Aos sábados, abrimos das **09:00 às 13:00**. 
 
-Passa aqui para conhecer nossos instrumentos ou ver alguma novidade! Se precisar de algo mais, é só chamar. 🎵
+Quer dar uma olhada em algum instrumento por aí?
 
 **Cliente:** Vocês vendem cabo para guitarra?
 
-**melodIA:** Oi! Então, por aqui nós trabalhamos **exclusivamente com instrumentos musicais** (como violões, guitarras, teclados, baterias, entre outros), então não vendemos cabos, palhetas, cases ou amplificadores. 
+**melodIA:** Não trabalhamos com acessórios — vendemos exclusivamente instrumentos musicais, como guitarras, violões, baixos e teclados, beleza? 
 
-Mas você gostaria de indicações de lojas parceiras aqui em Campo Grande onde você pode encontrar cabos para guitarra?
+Gostaria de indicações de lojas parceiras aqui em Campo Grande que vendem cabos e outros acessórios?
 
 **Cliente:** Quero sim
 
 > 🔧 `get_policy(topic='lojas_parceiras')`
 
-**melodIA:** Maravilha! Para encontrar cabos para guitarra, aqui em Campo Grande nós indicamos os nossos parceiros:
+**melodIA:** Para cabos e outros acessórios, temos duas ótimas indicações de parceiros aqui em Campo Grande:
 
-- **Palheta & Cia Acessórios Musicais** — lá você encontra cabos, cordas, palhetas, correias e cases.
-- **Ponto do Músico Áudio** — focado em pedais, amplificadores e equipamentos de som.
+- **Palheta & Cia Acessórios Musicais**: especializada em cordas, palhetas, cabos, correias e cases.
+- **Ponto do Músico Áudio**: focada em pedais, amplificadores e equipamentos de som.
 
-Recomendo dar uma passadinha lá ou conferir o contato deles para ver a disponibilidade. E se precisar de um instrumento novo por aí, já sabe, é só falar com a gente! 🎸
+É sempre bom conferir o endereço e o horário de funcionamento direto com eles, ok? 
+
+Se precisar de ajuda com algum instrumento musical, estou por aqui!
 
 **Cliente:** E você sabe quem ganhou o jogo do Flamengo ontem?
 
-**melodIA:** Opa, aí você me pegou! 😅 Por aqui eu entendo tudo de instrumentos musicais, mas de futebol confesso que estou meio por fora. 
+**melodIA:** Não acompanho futebol, meu forte é só música mesmo! 🎸 
 
-Se quiser saber sobre violões, guitarras, teclados ou qualquer outro instrumento do nosso catálogo, é só me falar! Como posso te ajudar hoje? 🎵
+Se precisar de ajuda com algum instrumento musical, é só me chamar.

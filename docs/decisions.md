@@ -65,6 +65,10 @@ Decisions taken during development. They feed the "Design decisions" and "Assump
    tools called, key arguments and required/forbidden text. The first run (13/14) showed the agent omitting the
    return deadline date and inventing an "inspection" condition; the prompt was fixed (not the test) and the next
    run passed 14/14. Quota on my account (AI Studio, 2026-11-02): flash-lite 15 RPM / 500 RPD.
+7. **Examples re-recorded with the final prompt.** Reviewing them showed the agent presenting 10 of 12 results as the
+   whole list (→ `showing` / `more_available` in `search_products` + prompt rule) and guessing when the 10-business-day
+   refund starts, which the manual doesn't say (→ prompt: state the 10 days, don't specify the start). Conversations
+   1 and 3 were recorded again after the fix, and the evaluation re-run passed 14/14.
 
 ## Policy manual inconsistencies (resolved in `data/policies.md`)
 

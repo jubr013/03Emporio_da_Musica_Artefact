@@ -10,9 +10,9 @@
 
 > 🔧 `search_products(query='Takamine GD20')`
 
-**melodIA:** O Takamine GD20 Dreadnought Natural custa R$ 2.199,00. 
+**melodIA:** O Takamine GD20 Dreadnought Natural custa R$ 2.199,00 à vista (preço de tabela). Pagando no PIX, você ganha 5% de desconto e sai por R$ 2.089,05, e também dá para parcelar conforme as regras da loja! 
 
-No PIX, ele sai com 5% de desconto por R$ 2.089,05! Quer saber mais detalhes desse violão ou condições de parcelamento?
+Ele está disponível aqui na Empório da Música. Quer garantir o seu ou saber mais sobre o parcelamento?
 
 **Cliente:** Ué, ele não estava com 12% de desconto? Vi uma oferta especial dele
 
@@ -20,14 +20,16 @@ No PIX, ele sai com 5% de desconto por R$ 2.089,05! Quer saber mais detalhes des
 
 > 🔧 `get_policy(topic='promocoes')`
 
-**melodIA:** Dá uma olhada: no momento não temos nenhuma promoção ativa ou campanha de 12% vigente para esse modelo por aqui. O preço dele no catálogo é R$ 2.199,00 mesmo (ou R$ 2.089,05 no PIX). 
+**melodIA:** Dando uma olhada aqui, o Takamine GD20 está por R$ 2.199,00, sem nenhuma promoção ativa no momento. 
 
-Pode ser que você tenha visto alguma oferta passada ou campanha específica que já encerrou. Mas olha, o GD20 é um violão incrível, com tampo em cedro sólido e um timbre super aconchegante. Quer que eu te ajude a ver as condições de parcelamento dele?
+Nós temos algumas campanhas ao longo do ano — como a Black Friday, Aniversário da loja e Semana do Músico —, mas no momento essa oferta de 12% não está vigente. 
+
+Ainda assim, se você fechar no PIX, ele tem aquele descontinho de 5%, saindo por R$ 2.089,05. O que acha?
 
 **Cliente:** E dá pra parcelar em quantas vezes no cartão?
 
 > 🔧 `get_policy(topic='pagamento')`
 
-**melodIA:** Dá sim! Você pode parcelar em até **12x sem juros** no cartão de crédito, desde que cada parcela seja de pelo menos R$ 100,00. 
+**melodIA:** Dá sim! Aqui na Empório da Música você pode parcelar no cartão de crédito em até **12x sem juros**, desde que a parcela seja de no mínimo R$ 100,00. 
 
-Como o Takamine GD20 custa R$ 2.199,00, dá para dividir em até 12 vezes tranquilamente! Quer aproveitar e garantir o seu?
+Com o valor do Takamine GD20 (R$ 2.199,00), você consegue dividir em até 12 vezes tranquilamente sem juros! Quer fechar o pedido por aqui?

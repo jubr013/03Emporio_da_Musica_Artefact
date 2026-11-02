@@ -269,6 +269,9 @@ The challenge says to make reasonable assumptions when something is ambiguous. T
 - E-mail: `contato@emporiodamusica.com.br` vs. `contato@empóriodamusica.com.br` → the accented one is treated as a typo.
 - Credit card minimum installment: the summary table says R$ 100; section 3.1 gives ranges (no minimum up to 3x,
   R$ 80 for 4–6x, R$ 100 for 7–12x) → the more specific section 3.1 prevails.
+- Refund "em até 10 dias úteis": the manual doesn't say from when the 10 business days count. The agent states the
+  10 days and doesn't specify the start, instead of guessing (an early version said "after the product arrives back
+  at the store", which is not in the policy).
 - The manual is an internal document: the agent uses it but never refers to it as "the internal manual".
 - **Partner stores** for accessories are mentioned but not listed in the manual. I added two **fictional** partner
   stores to `data/policies.md`, marked as an addition that is not in the original manual.
@@ -305,7 +308,7 @@ with a short context line in English; the conversation itself is in Portuguese.
 
 Two layers of tests:
 
-1. **Unit tests (`python -m pytest -q`, 69 tests, no API key).** Every tool (search, prices and promotions, order
+1. **Unit tests (`python -m pytest -q`, 70 tests, no API key).** Every tool (search, prices and promotions, order
    lookup and deadlines, tickets, policies, holidays, time zone) and the function-calling loop itself, using a fake
    model built from the SDK's real types: tool results go back with the right id, API errors roll back the turn,
    the round limit holds, order lookups are blocked after 3 failed verifications.
@@ -319,8 +322,14 @@ Two layers of tests:
 The first run passed 13/14: in the return scenario the agent applied the rule correctly but didn't say the deadline
 date and added a condition that is not in the policy ("after the product arrives and is inspected"). I fixed the
 prompt (always state the deadline; never add conditions the policy doesn't have), not the test, and the next run
-passed **14/14**. It is a single run of a non-deterministic model, so it shows the agent behaves as intended, not
-that it always will.
+passed **14/14**.
+
+Re-recording the example conversations with that prompt showed two more issues, both fixed: the agent presented
+10 of 12 search results as the full list (the search tool now returns `showing` / `more_available`, and the prompt
+requires saying when there are more), and it still guessed when the refund period starts (see
+[Assumptions](#assumptions)). The evaluation was run again after these fixes: **14/14**, which is the report in
+`docs/evaluation.md`. It is a single run of a non-deterministic model, so it shows the agent behaves as intended,
+not that it always will.
 
 ## Known limitations
 
@@ -329,8 +338,9 @@ that it always will.
   Each agent turn takes 2–3 requests, so the default model allows roughly 200 turns a day. Limits can differ per
   account and change over time. The free tier also returns occasional 503 errors at peak times.
 - **LLM variability.** Even with tools and a low temperature, the lite model sometimes phrases things imprecisely
-  (e.g. it occasionally says "o sistema" although the prompt asks it not to). Business rules are protected by
-  computing them in code, but wording is not deterministic.
+  (e.g. it occasionally says "o sistema" although the prompt asks it not to) or adds subjective sales talk that is not
+  in the product data (e.g. "recommended by music teachers"). Business rules are protected by computing them in
+  code, but wording is not deterministic.
 - **The evaluation is small and string-based.** 14 scenarios, run once, checked with tool names and required /
   forbidden text. It catches wrong tools, wrong numbers and leaks, but not tone or subtle wording problems, and a
   different run of the model may give different results.
