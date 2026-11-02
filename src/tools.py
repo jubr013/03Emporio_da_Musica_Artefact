@@ -4,17 +4,22 @@ Tools never invent data: when nothing matches they say so explicitly.
 """
 import json
 import os
+import re
 import uuid
 from datetime import date, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from src.data_loader import StoreData, digits_only, load_store_data, normalize_text
+from src.data_loader import StoreData, digits_only, load_store_data, normalize_text, search_form
 
 PIX_DISCOUNT = 0.05  # policy 3: 5% off the list price, not applied on top of promotions
+
+# The store's local time (UTC-4). Opening hours and deadlines follow it, not the machine's clock.
+STORE_TIMEZONE = ZoneInfo("America/Campo_Grande")
 
 # Deadlines from the policy manual (sections 4.1, 4.2 and 8.1), in calendar days
 RETURN_WINDOW_DAYS = 7       # from receipt
@@ -81,6 +86,26 @@ def _pricing(product: pd.Series) -> dict:
     }
 
 
+# Words that carry no meaning in a product search ("violão DE aço ATÉ mil") and would only cut results.
+# "corda(s)" is here too: customers say "cordas de aço", but product texts rarely contain the word.
+STOPWORDS = {
+    "de", "da", "do", "das", "dos", "com", "sem", "para", "pra", "e", "o", "a", "os", "as", "um", "uma", "ate", "em",
+    "corda", "cordas",
+}
+# Spelled-out numbers -> digits, as product names use digits ("7 Cordas")
+NUMBER_WORDS = {"quatro": "4", "cinco": "5", "seis": "6", "sete": "7", "doze": "12"}
+
+
+def _query_words(query: str) -> list:
+    words = [NUMBER_WORDS.get(word, word) for word in search_form(query).split()]
+    return [word for word in words if word not in STOPWORDS]
+
+
+def _word_prefix_pattern(word: str) -> str:
+    """Regex that matches `word` at the START of a word: 'baixo' matches 'baixos', but 'aco' doesn't match 'braco'."""
+    return r"\b" + re.escape(word)
+
+
 def search_products(
     query: Optional[str] = None,
     category_id: Optional[int] = None,
@@ -89,15 +114,16 @@ def search_products(
     only_available: bool = False,
     limit: int = 10,
 ) -> dict:
-    """Searches the catalog. Every word in `query` must appear in the product name, category or description.
+    """Searches the catalog. Every meaningful word in `query` must appear in the product's search text
+    (name, category, description and keywords from the specs).
 
     Price filters use the final price (with an active promotion applied), which is what the customer pays.
     """
     products = _store().products.copy()
 
     if query:
-        for word in normalize_text(query).split():
-            products = products[products["search_text"].str.contains(word, regex=False)]
+        for word in _query_words(query):
+            products = products[products["search_text"].str.contains(_word_prefix_pattern(word), regex=True)]
     if category_id is not None:
         products = products[products["category_id"] == category_id]
 
@@ -147,10 +173,21 @@ def get_product_details(product_id: int) -> dict:
     }
 
 
-def today() -> date:
-    """Current date for deadline checks. STORE_TODAY (YYYY-MM-DD) overrides it, see docs/decisions.md."""
+def now() -> datetime:
+    """Current date and time at the store (Campo Grande), whatever the time zone of the machine running the agent.
+
+    STORE_TODAY (YYYY-MM-DD) overrides only the date, see docs/decisions.md.
+    """
+    current = datetime.now(STORE_TIMEZONE)
     override = os.getenv("STORE_TODAY")
-    return date.fromisoformat(override) if override else date.today()
+    if override:
+        current = datetime.combine(date.fromisoformat(override), current.timetz())
+    return current
+
+
+def today() -> date:
+    """Current date for deadline checks (store time zone, STORE_TODAY override)."""
+    return now().date()
 
 
 def _identity_matches(customer: pd.Series, email: Optional[str], phone: Optional[str]) -> bool:
@@ -272,7 +309,7 @@ def create_support_ticket(
 
     ticket = {
         "protocol": f"EM{today():%Y%m%d}-{uuid.uuid4().hex[:6].upper()}",
-        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "created_at": now().isoformat(timespec="seconds"),
         "request_type": request_type,
         "order_id": order_id,
         "customer_contact": customer_contact,

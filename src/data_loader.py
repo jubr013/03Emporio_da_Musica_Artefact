@@ -33,9 +33,30 @@ def normalize_text(text: str) -> str:
     return without_accents.lower().strip()
 
 
+def search_form(text: str) -> str:
+    """Normalized text for keyword search: no accents, lowercase, and '-ões' plurals turned into '-ão'
+    ('violões' -> 'violao'), so singular and plural match. Regular '-s' plurals are handled by prefix matching."""
+    return re.sub(r"oes\b", "ao", normalize_text(text))
+
+
 def digits_only(text: str) -> str:
     """'(67) 99812-3456' -> '67998123456'. Used to compare phone numbers."""
     return re.sub(r"\D", "", str(text))
+
+
+def _spec_keywords(specs: dict) -> str:
+    """Words a customer would search for that sometimes only exist in the specs, not in the name/description.
+
+    E.g. 3 steel-string guitars never say "aço" in their text, and 2 with a pickup never say "eletroacústico".
+    """
+    words = []
+    if specs.get("strings") == "steel":
+        words.append("aco")
+    elif specs.get("strings") == "nylon":
+        words.append("nylon")
+    if specs.get("electronics") == "yes":
+        words.append("eletroacustico eletrico captacao")
+    return " ".join(words)
 
 
 def _load_products(data_dir: Path, categories: pd.DataFrame) -> pd.DataFrame:
@@ -49,10 +70,11 @@ def _load_products(data_dir: Path, categories: pd.DataFrame) -> pd.DataFrame:
     category_names = categories.set_index("category_id")["name"]
     products["category_name"] = products["category_id"].map(category_names)
 
-    # Accent-free text used for keyword search (name + category + description)
+    # Accent-free text used for keyword search (name + category + description + keywords from specs)
     products["search_text"] = (
         products["name"] + " " + products["category_name"] + " " + products["description"]
-    ).apply(normalize_text)
+        + " " + products["specs"].apply(_spec_keywords)
+    ).apply(search_form)
 
     return products.sort_values("product_id").reset_index(drop=True)
 

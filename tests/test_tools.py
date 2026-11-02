@@ -19,6 +19,29 @@ def test_search_violoes_up_to_1000_only_available():
     assert 113 not in ids  # discontinued
 
 
+def test_search_finds_steel_strings_from_specs():
+    # Takamine GD20 (95) has steel strings but never says "aço" in its name or description
+    ids = [p["product_id"] for p in search_products(query="violão de aço", limit=100)["products"]]
+    assert 95 in ids
+    assert len(ids) == 19  # every steel-string acoustic guitar
+
+
+def test_search_finds_electro_acoustic_from_specs():
+    result = search_products(query="violão eletroacústico", limit=100)
+    assert result["total"] == 14  # every acoustic guitar with electronics == "yes"
+
+
+def test_search_understands_spelled_out_numbers():
+    assert search_products(query="violão sete cordas", limit=100)["total"] == 5
+
+
+def test_search_matches_word_starts_only():
+    # "aço" must not match "braço" (both become "aco"/"braco" without accents): no nylon guitar should appear
+    results = search_products(query="violão cordas de aço", category_id=VIOLOES, limit=100)["products"]
+    assert len(results) == 19
+    assert not any("Nylon" in p["name"] for p in results)
+
+
 def test_search_without_results_says_so():
     result = search_products(query="pedal de distorção")
     assert result == {"found": False, "message": "Nenhum produto encontrado com esses critérios."}

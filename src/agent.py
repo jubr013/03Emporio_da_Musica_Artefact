@@ -6,7 +6,6 @@ so every step is explicit (see docs/decisions.md).
 """
 import os
 import sys
-from datetime import datetime
 from typing import Callable, Optional
 
 from google import genai
@@ -128,10 +127,11 @@ def run_tool(name: str, args: dict) -> dict:
 class Agent:
     """Keeps the conversation history in memory and answers one customer message at a time."""
 
-    def __init__(self, model: Optional[str] = None, on_tool_call: Optional[Callable] = None):
-        # Reads GEMINI_API_KEY from the environment. The free tier sometimes answers 503 (high demand),
-        # so we retry with exponential backoff before giving up.
-        self.client = genai.Client(http_options=types.HttpOptions(
+    def __init__(self, model: Optional[str] = None, on_tool_call: Optional[Callable] = None, client=None):
+        # `client` lets tests pass a fake model (no API calls). By default: the real Gemini client, which reads
+        # GEMINI_API_KEY from the environment. The free tier sometimes answers 503 (high demand), so we retry
+        # with exponential backoff before giving up.
+        self.client = client or genai.Client(http_options=types.HttpOptions(
             retry_options=types.HttpRetryOptions(attempts=5, initial_delay=2, max_delay=20)
         ))
         self.model = model or os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
@@ -140,10 +140,9 @@ class Agent:
         self.tool_declarations = types.Tool(function_declarations=_function_declarations())
 
     def _config(self) -> types.GenerateContentConfig:
-        # Rebuilt every turn so the prompt has the current date/time (date honours STORE_TODAY)
-        now = datetime.combine(tools.today(), datetime.now().time())
+        # Rebuilt every turn so the prompt has the store's current date/time (date honours STORE_TODAY)
         return types.GenerateContentConfig(
-            system_instruction=build_system_prompt(now),
+            system_instruction=build_system_prompt(tools.now()),
             tools=[self.tool_declarations],
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
             temperature=0.3,  # low: we want consistent, factual answers

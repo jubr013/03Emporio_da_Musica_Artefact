@@ -36,7 +36,8 @@ def test_products_have_category_name_and_search_text(store):
     takamine = store.products.set_index("product_id").loc[95]
     assert takamine["category_name"] == "Violões"
     assert "takamine gd20" in takamine["search_text"]
-    assert "violoes" in takamine["search_text"]
+    assert "violao" in takamine["search_text"]  # category "Violões" in singular search form
+    assert "aco" in takamine["search_text"]     # steel strings, only stated in the specs
 
 
 def test_customer_identity_columns(store):
