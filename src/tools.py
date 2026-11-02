@@ -2,14 +2,29 @@
 
 Tools never invent data: when nothing matches they say so explicitly.
 """
+import os
+from datetime import date, timedelta
 from functools import lru_cache
 from typing import Optional
 
 import pandas as pd
 
-from src.data_loader import StoreData, load_store_data, normalize_text
+from src.data_loader import StoreData, digits_only, load_store_data, normalize_text
 
 PIX_DISCOUNT = 0.05  # policy 3: 5% off the list price, not applied on top of promotions
+
+# Deadlines from the policy manual (sections 4.1, 4.2 and 8.1), in calendar days
+RETURN_WINDOW_DAYS = 7       # from receipt
+DEFECT_EXCHANGE_DAYS = 30    # from purchase
+LEGAL_WARRANTY_DAYS = 90     # from receipt
+
+STATUS_LABELS = {
+    "pending": "pendente (aguardando pagamento/processamento)",
+    "confirmed": "confirmado (em preparação, ainda não enviado)",
+    "shipped": "enviado (em transporte)",
+    "delivered": "entregue",
+    "cancelled": "cancelado",
+}
 
 
 @lru_cache(maxsize=1)
@@ -126,4 +141,105 @@ def get_product_details(product_id: int) -> dict:
         "stock_quantity": int(product["stock_quantity"]),
         "availability": _availability(product),
         **_pricing(product),
+    }
+
+
+def today() -> date:
+    """Current date for deadline checks. STORE_TODAY (YYYY-MM-DD) overrides it, see docs/decisions.md."""
+    override = os.getenv("STORE_TODAY")
+    return date.fromisoformat(override) if override else date.today()
+
+
+def _identity_matches(customer: pd.Series, email: Optional[str], phone: Optional[str]) -> bool:
+    """True if the e-mail or the phone given by the person belongs to the order's customer."""
+    if email and normalize_text(email) == customer["email_normalized"]:
+        return True
+    if phone:
+        given = digits_only(phone)
+        # Accept the number with or without the area code (67), but not tiny fragments
+        if len(given) >= 8 and customer["phone_digits"].endswith(given):
+            return True
+    return False
+
+
+def _deadline(start: date, days: int) -> dict:
+    deadline = start + timedelta(days=days)
+    days_left = (deadline - today()).days
+    return {"deadline": deadline.isoformat(), "within_deadline": days_left >= 0, "days_left": max(days_left, 0)}
+
+
+def _deadlines(order: pd.Series, received_on: Optional[str]) -> dict:
+    """Return / exchange / warranty deadlines for a delivered order (rules in docs/decisions.md)."""
+    order_date = order["order_date"].date()
+    estimated = order["estimated_delivery"].date()
+    receipt_date, source, needs_staff, warnings = estimated, "estimated", False, []
+
+    if received_on:
+        try:
+            informed = date.fromisoformat(received_on)
+        except ValueError:
+            informed = None
+            warnings.append(f"Data informada '{received_on}' inválida; usando a previsão de entrega.")
+        if informed and not (order_date <= informed <= today()):
+            warnings.append("Data informada fora do intervalo entre a compra e hoje; usando a previsão de entrega.")
+        elif informed:
+            receipt_date, source = informed, "customer"
+            # A later date extends the deadline in the customer's favour -> the team confirms it
+            needs_staff = informed > estimated
+
+    return {
+        "today": today().isoformat(),
+        "receipt_date": receipt_date.isoformat(),
+        "receipt_date_source": source,
+        "requires_staff_confirmation": needs_staff,
+        "warnings": warnings,
+        "return_window_7_days_from_receipt": _deadline(receipt_date, RETURN_WINDOW_DAYS),
+        "defect_exchange_30_days_from_purchase": _deadline(order_date, DEFECT_EXCHANGE_DAYS),
+        "legal_warranty_90_days_from_receipt": _deadline(receipt_date, LEGAL_WARRANTY_DAYS),
+    }
+
+
+def get_order_status(
+    order_id: int,
+    email: Optional[str] = None,
+    phone: Optional[str] = None,
+    received_on: Optional[str] = None,
+) -> dict:
+    """Order status for a verified customer (order number + e-mail or phone of whoever placed it).
+
+    For delivered orders it also computes return, exchange and warranty deadlines.
+    `received_on` (YYYY-MM-DD) is the receipt date confirmed by the customer, if different from the estimate.
+    """
+    if not email and not phone:
+        return {"verified": False, "message": "Para consultar o pedido, peça o e-mail ou o telefone usado na compra."}
+
+    store = _store()
+    match = store.orders[store.orders["order_id"] == order_id]
+    customer = None
+    if not match.empty:
+        customer = store.customers.set_index("customer_id").loc[match.iloc[0]["customer_id"]]
+    # Same message for "order doesn't exist" and "identity doesn't match": don't reveal which order numbers exist
+    if customer is None or not _identity_matches(customer, email, phone):
+        return {"verified": False, "message": "Não encontrei um pedido com esse número e esses dados de contato."}
+
+    order = match.iloc[0]
+    items = store.order_items[store.order_items["order_id"] == order_id].merge(
+        store.products[["product_id", "name"]], on="product_id", how="left"
+    )
+    has_delivery_estimate = pd.notna(order["estimated_delivery"])
+
+    return {
+        "verified": True,
+        "order_id": int(order["order_id"]),
+        "customer_first_name": customer["name"].split()[0],
+        "status": order["status"],
+        "status_label": STATUS_LABELS.get(order["status"], order["status"]),
+        "order_date": order["order_date"].date().isoformat(),
+        "total_brl": float(order["total_brl"]),
+        "payment_method": order["payment_method"],
+        "items": [{"name": row["name"], "quantity": int(row["quantity"])} for _, row in items.iterrows()],
+        "tracking_code": order["tracking_code"],
+        "estimated_delivery": order["estimated_delivery"].date().isoformat() if has_delivery_estimate else None,
+        "notes": order["notes"],
+        "deadlines": _deadlines(order, received_on) if order["status"] == "delivered" else None,
     }

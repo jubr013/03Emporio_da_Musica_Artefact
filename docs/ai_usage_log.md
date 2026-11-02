@@ -10,3 +10,5 @@ Running log for the README section "Use of coding assistants". Tool: Claude Code
 | 2026-10-31 | Write `src/data_loader.py` and its pytest tests | Load everything in memory with pandas; normalize text/phones/emails at load time |
 | 2026-10-31 | Write product tools (`search_products`, `get_product_details`) and tests | Scope for the session (orders/policies left for Monday); price filters use the final price |
 | 2026-10-31 | Transcribe the policy PDF into `data/policies.md` (one section per topic) and write `get_policy` | No RAG/embeddings for 8 pages; how to resolve the manual's inconsistencies (phone, e-mail, installments) |
+| 2026-10-31 | Propose options for the order tool (today's date, identity check, receipt date, who computes deadlines) | All four choices; receipt date combining the estimate with the customer's confirmation was my idea (see `docs/decisions.md`) |
+| 2026-11-02 | Implement `get_order_status` from those decisions, with tests | Reviewed the deadline rules against the policy manual |
