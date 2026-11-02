@@ -23,6 +23,23 @@ Decisions taken during development. They feed the "Design decisions" and "Assump
    - Return (arrependimento) and legal warranty count from the **receipt** date; defect exchange (30 days) counts
      from the **purchase** (order) date, as written in the policy manual.
 
+## Agent (decided 2026-11-02)
+
+1. **Tool-calling loop written by hand** (automatic function calling of the SDK disabled): send message →
+   model asks for a tool → code runs it → result goes back → repeat until a text answer. Every step is visible,
+   easy to explain and to log.
+2. **Persona name: melodIA** — the store's virtual assistant. Name chosen by me; the manual only says "assistente virtual".
+3. **Partner stores for accessories:** the manual says to suggest partner stores "when possible" but lists none.
+   Two **fictional** partner stores were added to `data/policies.md` (section `lojas_parceiras`), clearly marked
+   as an addition that is not in the original manual. The agent first explains that the store doesn't sell
+   accessories and **asks** whether the customer wants partner suggestions; it only lists them if they say yes.
+4. **Support tickets:** in a first real test the agent claimed it had "forwarded" a return request although it had
+   no way to do that. Added `create_support_ticket`, which writes the request to `history/tickets.jsonl` and returns
+   a protocol number (the prototype's stand-in for the team's inbox). The prompt forbids claiming any action
+   without calling the matching tool.
+5. **Model errors:** the free tier sometimes answers 503 (high demand). The client retries with exponential backoff;
+   if it still fails, the agent answers with a polite fallback message and rolls back the unfinished turn.
+
 ## Policy manual inconsistencies (resolved in `data/policies.md`)
 
 - Phone: (67) 3341-4444 used as landline, (67) 3321-4500 as WhatsApp (as section 7 names it).

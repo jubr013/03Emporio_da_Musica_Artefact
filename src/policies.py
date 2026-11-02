@@ -13,6 +13,8 @@ def _sections() -> dict:
     sections = {}
     current_topic = None
     for line in POLICIES_FILE.read_text(encoding="utf-8").splitlines():
+        if line.startswith("<!--"):
+            continue  # notes for developers, not policy text
         if line.startswith("## "):
             current_topic = line[3:].strip()
             sections[current_topic] = []

@@ -153,3 +153,14 @@ A loja segue a Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018). 
 - Cumprimento de obrigações legais e fiscais.
 
 Dados de clientes não são compartilhados com terceiros para fins de marketing. O cliente pode pedir a exclusão dos seus dados a qualquer momento pelo WhatsApp ou e-mail.
+
+## lojas_parceiras
+
+<!-- Not in the original manual: fictional partner stores added for the prototype (see docs/decisions.md). -->
+
+A Empório da Música não vende acessórios. Para cordas, palhetas, cabos, cases, pedais e amplificadores, a loja indica parceiros em Campo Grande:
+
+- Palheta & Cia Acessórios Musicais — cordas, palhetas, cabos, correias e cases.
+- Ponto do Músico Áudio — pedais, amplificadores e equipamentos de som.
+
+Endereços e horários devem ser confirmados diretamente com os parceiros.

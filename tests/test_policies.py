@@ -4,8 +4,12 @@ from src.policies import get_policy, list_policy_topics
 def test_all_topics_are_loaded():
     assert list_policy_topics() == [
         "sobre_a_loja", "horarios", "pagamento", "trocas_e_devolucoes",
-        "frete_e_entregas", "promocoes", "atendimento", "garantia", "privacidade",
+        "frete_e_entregas", "promocoes", "atendimento", "garantia", "privacidade", "lojas_parceiras",
     ]
+
+
+def test_developer_comments_are_not_returned():
+    assert "<!--" not in get_policy("lojas_parceiras")["content"]
 
 
 def test_get_policy_returns_section_content():

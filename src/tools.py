@@ -2,9 +2,12 @@
 
 Tools never invent data: when nothing matches they say so explicitly.
 """
+import json
 import os
-from datetime import date, timedelta
+import uuid
+from datetime import date, datetime, timedelta
 from functools import lru_cache
+from pathlib import Path
 from typing import Optional
 
 import pandas as pd
@@ -243,3 +246,34 @@ def get_order_status(
         "notes": order["notes"],
         "deadlines": _deadlines(order, received_on) if order["status"] == "delivered" else None,
     }
+
+
+TICKETS_FILE = Path(__file__).resolve().parent.parent / "history" / "tickets.jsonl"
+TICKET_TYPES = ["devolucao", "troca", "garantia", "reclamacao", "outro"]
+
+
+def create_support_ticket(
+    request_type: str,
+    summary: str,
+    order_id: Optional[int] = None,
+    customer_contact: Optional[str] = None,
+) -> dict:
+    """Registers a request for the human team (policy 7.3: register and forward, reply within 24 business hours).
+
+    In this prototype the "team inbox" is a JSON Lines file (one JSON object per line) in history/.
+    """
+    if request_type not in TICKET_TYPES:
+        return {"created": False, "message": f"Tipo inválido. Use um destes: {', '.join(TICKET_TYPES)}."}
+
+    ticket = {
+        "protocol": f"EM{today():%Y%m%d}-{uuid.uuid4().hex[:6].upper()}",
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "request_type": request_type,
+        "order_id": order_id,
+        "customer_contact": customer_contact,
+        "summary": summary,
+    }
+    TICKETS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with TICKETS_FILE.open("a", encoding="utf-8") as file:
+        file.write(json.dumps(ticket, ensure_ascii=False) + "\n")
+    return {"created": True, "protocol": ticket["protocol"], "response_time": "até 24 horas úteis"}
