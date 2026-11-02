@@ -72,11 +72,12 @@ Run the tests (no API key needed: the tools are tested directly and the agent lo
 python -m pytest -q
 ```
 
-Evaluate the agent against the real model (14 scripted scenarios, ~35 requests of the free quota; see
+Evaluate the agent against the real model (15 scripted scenarios, ~40 requests of the free quota per run; see
 [Evaluation](#evaluation)):
 
 ```bash
-python scripts/evaluate_agent.py
+python scripts/evaluate_agent.py            # 1 run
+python scripts/evaluate_agent.py --runs 3   # 3 runs per scenario, reports a pass rate (~120 requests)
 ```
 
 Environment variables (`.env`):
@@ -85,6 +86,7 @@ Environment variables (`.env`):
 |---|---|---|
 | `GEMINI_API_KEY` | — | Your Gemini API key (required) |
 | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Model name. `python scripts/check_gemini.py` lists the models your key can use |
+| `GEMINI_FALLBACK_MODEL` | `gemini-3.1-flash-lite` | Used automatically if the main model's daily quota runs out (empty disables it) |
 | `STORE_TODAY` | empty (real date) | Overrides "today" for deadline checks |
 
 ## How it works
@@ -167,7 +169,10 @@ purpose**, so every step (tool requested → executed → result returned) is ex
   takes 2–3 requests. The quota ran out while recording the examples, so I switched the default to
   `gemini-3.5-flash-lite`, which has its own quota, handled the tool calls and policy rules correctly in my tests
   and is faster. Switching models is one line in `.env`.
-- Temperature 0.3: customer service needs consistent, factual answers more than creativity.
+- Temperature 0: customer service needs consistent, factual answers, not creative ones.
+- **Fallback model:** if the main model's daily quota runs out (429 even after the SDK's retries), the agent switches
+  to `gemini-3.1-flash-lite`, which has its own free quota, for the rest of the conversation, so an evaluator
+  doesn't hit a dead end.
 
 ### Retrieval: pandas for data, sectioned Markdown for policies (no RAG)
 
@@ -178,7 +183,10 @@ purpose**, so every step (tool requested → executed → result returned) is ex
   words that exist only in the specs are added to the search text (3 steel-string guitars never say "aço", 2 with a
   pickup never say "eletroacústico"); words match at the **start** of a word, so "aço" no longer matches "braço"
   ("braco" without accents) while "baixo" still matches "baixos"; "-ões" plurals match "-ão"; spelled-out numbers
-  become digits ("sete cordas" → "7 cordas"); filler words ("de", "com", "até", "cordas") are ignored.
+  become digits ("sete cordas" → "7 cordas"); filler words ("de", "com", "até", "cordas") are ignored; model codes are
+  glued together, so "GD 20", "GD-20" and "GD20" all find the Takamine GD20. I did not add typo tolerance: the LLM
+  writes the search query, so it already fixes customer typos ("takamini" → "takamine"); what it doesn't fix is how
+  a model code is formatted.
 - **Policies → `get_policy(topic)` over a Markdown file split by topic.** The manual is 8 pages. Embeddings and a
   vector store would add moving parts and make retrieval fuzzy, while a fixed list of topics (sent to the model as
   an `enum`) makes it explicit **when** the agent consults policies, which is one of the challenge's goals.
@@ -308,11 +316,12 @@ with a short context line in English; the conversation itself is in Portuguese.
 
 Two layers of tests:
 
-1. **Unit tests (`python -m pytest -q`, 70 tests, no API key).** Every tool (search, prices and promotions, order
-   lookup and deadlines, tickets, policies, holidays, time zone) and the function-calling loop itself, using a fake
-   model built from the SDK's real types: tool results go back with the right id, API errors roll back the turn,
-   the round limit holds, order lookups are blocked after 3 failed verifications.
-2. **Scenario evaluation against the real model (`python scripts/evaluate_agent.py`).** 14 scripted customer
+1. **Unit tests (`python -m pytest -q`, 107 tests, no API key).** Every tool (search, prices and promotions, order
+   lookup and deadlines, tickets, policies, holidays, time zone), the policy transcription against the original PDF,
+   and the function-calling loop itself, using a fake model built from the SDK's real types: tool results go back
+   with the right id, API errors roll back the turn, the round limit holds, order lookups are blocked after 3 failed
+   verifications, and the fallback model takes over when the quota runs out.
+2. **Scenario evaluation against the real model (`python scripts/evaluate_agent.py`).** 15 scripted customer
    messages. For each one the script checks **which tools were called** (data vs. policy vs. none), key **tool
    arguments** (e.g. the price filter), text that **must** appear (correct price, PIX price, deadline, tracking code)
    and text that **must not** appear (a discount that isn't active, an invented price for a product the store doesn't
@@ -327,23 +336,28 @@ passed **14/14**.
 Re-recording the example conversations with that prompt showed two more issues, both fixed: the agent presented
 10 of 12 search results as the full list (the search tool now returns `showing` / `more_available`, and the prompt
 requires saying when there are more), and it still guessed when the refund period starts (see
-[Assumptions](#assumptions)). The evaluation was run again after these fixes: **14/14**, which is the report in
-`docs/evaluation.md`. It is a single run of a non-deterministic model, so it shows the agent behaves as intended,
-not that it always will.
+[Assumptions](#assumptions)). Its recommendations also included sales talk not supported by the data ("recommended
+by music teachers"); the prompt now requires recommendations grounded in the product data, temperature went to 0,
+and a 15th scenario checks for that.
+
+Since the model is not deterministic, the final evaluation runs **every scenario 3 times**:
+**45/45 runs passed** (report in [`docs/evaluation.md`](docs/evaluation.md)). That is good evidence the agent behaves
+as intended, not a guarantee that it always will.
 
 ## Known limitations
 
 - **Free tier quotas.** On my account's AI Studio rate-limit page (checked 2026-11-02), `gemini-3.5-flash-lite` allows
   **15 requests/minute and 500/day**; `gemini-3.5-flash` (served as Gemini 3.6 Flash) only 5/minute and 20/day.
-  Each agent turn takes 2–3 requests, so the default model allows roughly 200 turns a day. Limits can differ per
-  account and change over time. The free tier also returns occasional 503 errors at peak times.
-- **LLM variability.** Even with tools and a low temperature, the lite model sometimes phrases things imprecisely
-  (e.g. it occasionally says "o sistema" although the prompt asks it not to) or adds subjective sales talk that is not
-  in the product data (e.g. "recommended by music teachers"). Business rules are protected by computing them in
-  code, but wording is not deterministic.
-- **The evaluation is small and string-based.** 14 scenarios, run once, checked with tool names and required /
-  forbidden text. It catches wrong tools, wrong numbers and leaks, but not tone or subtle wording problems, and a
-  different run of the model may give different results.
+  Each agent turn takes 2–3 requests, so the default model allows roughly 200 turns a day; when its daily quota runs
+  out, the agent falls back to `gemini-3.1-flash-lite` (another 500/day). Limits can differ per account and change
+  over time. The free tier also returns occasional 503 errors at peak times (retried automatically).
+- **LLM variability.** Wording is not deterministic. During development the lite model said "o sistema" and added
+  sales talk not in the data ("recommended by music teachers"); prompt rules, temperature 0 and a dedicated evaluation
+  scenario now cover these, and the last evaluation passed 45/45 runs, but a rare unsupported phrase can still slip
+  through. Business rules (prices, deadlines, identity) don't depend on wording: they are computed in code.
+- **The evaluation is small and string-based.** 15 scenarios × 3 runs, checked with tool names, key arguments and
+  required / forbidden text. It catches wrong tools, wrong numbers, leaks and known bad phrases, but not tone or new
+  kinds of wording problems.
 - **Keyword search, not semantic search.** Every meaningful word of the query must start a word in the product's
   text. There is no typo tolerance and only the few normalizations described above; for anything else the model has
   to rephrase the query or filter by category.
@@ -353,13 +367,19 @@ not that it always will.
   update.
 - **Conversation history is saved but not reloaded:** each run starts a new conversation.
 - **Identity check is basic:** order number + e-mail or phone, at most 3 failed attempts per conversation; there is
-  no one-time code, and a new conversation resets the counter.
-- **Policies were transcribed by hand:** if the manual changes, `data/policies.md` must be updated.
+  no one-time code, and a new conversation resets the counter. I deliberately did not lock the **order** after failed
+  attempts: anyone could then block another customer's order just by typing wrong e-mails. In a real channel the
+  limit would be per origin (the customer's WhatsApp number), which a CLI doesn't have.
+- **Policies were transcribed by hand.** A test reads the original PDF and checks that 26 key facts (deadlines,
+  amounts, hours, contacts) appear identically in `data/policies.md`, so a changed manual makes the test fail; but
+  rewording that keeps the numbers would not be detected.
 
 ## What I would do with more time
 
-- **Stronger evaluation:** more scenarios (multi-turn ones included), several runs per scenario to measure pass rates,
-  an LLM-as-judge for tone and grounding, and running it in CI on every prompt change.
+- **Stronger evaluation:** more scenarios (multi-turn ones included), an LLM-as-judge for tone and grounding, and
+  running it in CI on every prompt change.
+- **Answer self-check:** a second, cheap model call that checks each answer against the tool results before it is
+  sent (catches unsupported claims), at the cost of double the requests and latency.
 - **Real channel:** WhatsApp or web chat integration, and tickets going to a real helpdesk with human handoff.
 - **Better search:** typo tolerance, a real synonym list, or embeddings if the catalog grows to the
   "300+ instruments" the manual mentions.

@@ -70,6 +70,24 @@ Decisions taken during development. They feed the "Design decisions" and "Assump
    refund starts, which the manual doesn't say (→ prompt: state the 10 days, don't specify the start). Conversations
    1 and 3 were recorded again after the fix, and the evaluation re-run passed 14/14.
 
+## Last round of limitation fixes (decided 2026-11-02)
+
+1. **Grounded recommendations.** The prompt now says recommendations must cite product data and must not attribute
+   opinions to others ("teachers recommend") or make unsupported claims ("best seller"); temperature 0.3 → 0. A new
+   evaluation scenario fails on those phrases and on internal wording ("sistema", "ferramenta", "manual interno").
+2. **Fallback model.** On a 429 that survives the SDK's retries (daily quota), the agent switches once to
+   `GEMINI_FALLBACK_MODEL` (`gemini-3.1-flash-lite`, its own 500/day quota) for the rest of the conversation.
+3. **Policy transcription test.** `tests/test_policies_match_pdf.py` reads the original PDF with `pypdf` and checks
+   that 26 key facts appear identically in `data/policies.md`.
+4. **Model codes in search.** Typo tolerance was not added (the LLM writes the query and already fixes typos); model
+   codes are glued instead, so "GD 20" / "GD-20" / "GD20" match. Only letter groups of up to 4 characters are glued,
+   so "violão 7 cordas" keeps working.
+5. **Evaluation pass rate.** `--runs N` runs every scenario N times and reports passes per scenario. Final run:
+   15 scenarios × 3 runs, 45/45 passed. Example 01 was re-recorded: recommendations now cite the product descriptions.
+6. **Not done on purpose:** locking an order after failed verifications (it would let anyone block another customer's
+   order); holidays from a library (municipal holidays missing, extra dependency); reloading saved conversations and
+   a real helpdesk (little value for a prototype).
+
 ## Policy manual inconsistencies (resolved in `data/policies.md`)
 
 - Phone: (67) 3341-4444 used as landline, (67) 3321-4500 as WhatsApp (as section 7 names it).

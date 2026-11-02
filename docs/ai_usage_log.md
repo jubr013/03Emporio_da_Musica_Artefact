@@ -23,3 +23,5 @@ Running log for the README section "Use of coding assistants". Tool: Claude Code
 | 2026-11-02 | Review the known limitations and estimate which are worth fixing | Looked up the real quota in AI Studio myself; chose holidays, identity attempt limit and evaluation |
 | 2026-11-02 | Verify Campo Grande holidays on the web, write the calendar, attempt limit and evaluation script | First evaluation failed 1/14: fix the prompt, not the test |
 | 2026-11-02 | Re-record the 5 examples with the final prompt and review them | Re-record instead of keeping old ones; fix the partial-list and refund-start issues the review found |
+| 2026-11-02 | Go through every known limitation with cost, risk and a recommendation | Do: grounded recommendations, fallback model, multi-run evaluation, PDF check, model codes in search. Don't: per-order lock, holiday library, conversation reload, real helpdesk |
+| 2026-11-02 | AI argued against fuzzy search (the LLM already fixes typos) and against a per-order lock (lets anyone block someone else's order) | Accepted both: smaller search fix, lock left as a documented trade-off |
