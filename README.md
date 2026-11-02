@@ -16,7 +16,7 @@ melodIA: O Takamine GD20 Dreadnought Natural custa R$ 2.199,00. No PIX, ele sai 
 
 ## Contents
 
-- [Requirements](#requirements) · [How to run](#how-to-run)
+- [Requirements](#requirements) · [How to run](#how-to-run) · [Optional web UI](#optional-web-ui)
 - [How it works](#how-it-works) · [Project structure](#project-structure)
 - [Design decisions](#design-decisions)
 - [Assumptions](#assumptions)
@@ -29,6 +29,7 @@ melodIA: O Takamine GD20 Dreadnought Natural custa R$ 2.199,00. No PIX, ele sai 
 - Python 3.12 (developed and tested with 3.12.10). Python 3.9 does **not** work: the `google-genai` 2.x SDK
   doesn't support it.
 - A free Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey) (no credit card needed)
+- Only for the optional web UI: Node.js 22.12+ (tested with 26.13)
 
 ## How to run
 
@@ -72,7 +73,7 @@ To reproduce the return scenarios of the examples:
 python -m src.main --show-tools --today 2026-02-20
 ```
 
-Run the tests (no API key needed: the tools are tested directly and the agent loop with a fake model):
+Run the tests (no API key needed: the tools are tested directly, the agent loop and the web API with a fake model):
 
 ```bash
 python -m pytest -q
@@ -101,7 +102,8 @@ A small React + TypeScript + Tailwind chat on top of the same agent, for local u
 needs; this is an extra. It shows, under each answer, **which lookups the agent made** (🔎 data, 📋 policy,
 📝 support ticket), and has a "Data simulada" field that does the same as `--today`.
 
-Requires Node.js 20.19+ (tested with 26.13). Run in two terminals, from the repo root:
+Requires Node.js 22.12+ (tested with 26.13; Vitest, used by the frontend tests, needs 22.12+). Run in two terminals,
+from the repo root:
 
 ```bash
 # Terminal 1: Python API (same venv as above)
@@ -114,6 +116,7 @@ npm run dev                     # then open http://localhost:5173
 ```
 
 The web app forwards `/api` to the Python API (`web/vite.config.ts`). Frontend tests: `npm test` inside `web/`.
+Conversations in the web UI live in the API's memory only (they are not saved to `history/` like the CLI's).
 
 ## How it works
 
@@ -164,7 +167,8 @@ return policy).
 │   ├── policies.py            # policy lookup by topic
 │   ├── store_calendar.py      # holidays (store closed): national, MS state and Campo Grande
 │   └── data_loader.py         # loads and cleans the CSVs once
-├── tests/                     # pytest: every tool, plus the agent loop with a fake model (no API calls)
+├── tests/                     # pytest: every tool, the agent loop and the web API with a fake model (no API
+│                              # calls), and the policy transcription checked against the original PDF
 ├── examples/                  # 5 example conversations recorded from real runs
 ├── scripts/
 │   ├── evaluate_agent.py      # scripted scenarios against the real model -> docs/evaluation.md
@@ -218,8 +222,9 @@ purpose**, so every step (tool requested → executed → result returned) is ex
 - **Policies → `get_policy(topic)` over a Markdown file split by topic.** The manual is 8 pages. Embeddings and a
   vector store would add moving parts and make retrieval fuzzy, while a fixed list of topics (sent to the model as
   an `enum`) makes it explicit **when** the agent consults policies, which is one of the challenge's goals.
-  I transcribed the PDF by hand instead of extracting it with code because automatic extraction broke the tables
-  (hours, payment, shipping).
+  I transcribed the PDF by hand instead of extracting it with code because plain-text extraction flattens the tables
+  (hours, payment, shipping) into run-on lines; a test checks the transcription against the PDF (see
+  [Known limitations](#known-limitations)).
 
 ### Business rules live in code, not in the prompt
 
@@ -273,9 +278,9 @@ unsure. Key points:
   deliberately thin: a FastAPI endpoint (`src/api.py`) reuses the same `Agent`, keeps one conversation per browser
   session in memory and handles one request at a time (it's meant for local use by one person). The UI's main
   feature is showing the agent's decisions, i.e. which data or policy lookups each answer is based on.
-- **History in memory** during the session (the model needs it to follow the conversation). When the chat ends, it
+- **History in memory** during the session (the model needs it to follow the conversation). When a CLI chat ends, it
   is saved to `history/` as JSON (full, with tool results) and Markdown (readable). The example conversations come
-  straight from these files.
+  straight from these files. Web UI conversations stay in the API's memory only.
 
 ### Error handling
 
@@ -338,7 +343,7 @@ with a short context line in English; the conversation itself is in Portuguese.
 
 | File | Scenario |
 |---|---|
-| [`01_catalog_guitars_up_to_1000.md`](examples/01_catalog_guitars_up_to_1000.md) | Acoustic guitars up to R$ 1000, then a nylon recommendation for a beginner |
+| [`01_catalog_guitars_up_to_1000.md`](examples/01_catalog_guitars_up_to_1000.md) | Acoustic guitars up to R$ 1000 (shows 10 of 12 and says so), then a nylon recommendation for a beginner grounded in the product descriptions |
 | [`02_price_expired_promotion.md`](examples/02_price_expired_promotion.md) | Price of the Takamine GD20; the customer asks about a 12% discount that is no longer active; installments |
 | [`03_return_within_window.md`](examples/03_return_within_window.md) | **Non-trivial:** regret return inside the 7-day window → identity check, deadlines, support ticket with protocol |
 | [`04_return_outside_window.md`](examples/04_return_outside_window.md) | **Non-trivial:** wrong e-mail rejected, right phone accepted; window expired → legal warranty explained |
@@ -349,11 +354,11 @@ with a short context line in English; the conversation itself is in Portuguese.
 Two layers of tests:
 
 1. **Unit tests (`python -m pytest -q`, 119 tests, no API key; plus 11 frontend tests with `npm test` in `web/`).**
-   Every tool (search, prices and promotions, order lookup and deadlines, tickets, policies, holidays, time zone), the
-   web API, the policy transcription against the original PDF,
-   and the function-calling loop itself, using a fake model built from the SDK's real types: tool results go back
-   with the right id, API errors roll back the turn, the round limit holds, order lookups are blocked after 3 failed
-   verifications, and the fallback model takes over when the quota runs out.
+   Every tool (search, prices and promotions, order lookup and deadlines, tickets, policies, holidays, time zone),
+   the policy transcription against the original PDF, the web API, and the function-calling loop itself, using a fake
+   model built from the SDK's real types: tool results go back with the right id, API errors roll back the turn, the
+   round limit holds, order lookups are blocked after 3 failed verifications, and the fallback model takes over when
+   the quota runs out. The frontend tests mock the API (messages, lookup labels, session, simulated date, errors).
 2. **Scenario evaluation against the real model (`python scripts/evaluate_agent.py`).** 15 scripted customer
    messages. For each one the script checks **which tools were called** (data vs. policy vs. none), key **tool
    arguments** (e.g. the price filter), text that **must** appear (correct price, PIX price, deadline, tracking code)
@@ -398,7 +403,9 @@ as intended, not a guarantee that it always will.
 - **Holiday list is maintained by hand.** It covers national, MS state and Campo Grande holidays from official and
   local calendars; a change in the law, or the store's "extended hours" on special dates (policy 2), would need an
   update.
-- **Conversation history is saved but not reloaded:** each run starts a new conversation.
+- **Conversation history is saved but not reloaded:** each CLI run starts a new conversation.
+- **The web UI is a local extra:** one person, one request at a time, conversations kept in the API's memory (lost
+  when it restarts and not saved to `history/`), no authentication, no deployment.
 - **Identity check is basic:** order number + e-mail or phone, at most 3 failed attempts per conversation; there is
   no one-time code, and a new conversation resets the counter. I deliberately did not lock the **order** after failed
   attempts: anyone could then block another customer's order just by typing wrong e-mails. In a real channel the
@@ -434,8 +441,12 @@ How I worked with it:
 - **Planning first.** Before writing code I summarized the challenge, the data and the policy manual in a handoff file
   (requirements, schedule, architecture options) and started the coding sessions from it.
 - **Small steps, one commit each.** The AI wrote code in small pieces (data loader → product tools → policies →
-  order tool → agent → CLI → examples), each with tests. I reviewed each step, and the AI proposed the files and the
-  commit message, but only committed after my approval. Commits carry a `Co-Authored-By` trailer.
+  order tool → agent → CLI → examples → evaluation → optional web UI), each with tests. I reviewed each step, and the
+  AI proposed the files and the commit message, but only committed after my approval. Commits carry a
+  `Co-Authored-By` trailer. The web UI was built on a separate branch and merged only after I tested and approved it.
+- **It weighed costs, I chose scope.** When I had extra time, it listed each known limitation with cost, risk and a
+  recommendation; I picked what to fix and what to leave documented (e.g. it argued against fuzzy search and against
+  locking an order after failed attempts, and I agreed).
 - **I made the decisions; the AI laid out the options.** For each ambiguous point it presented options with a
   recommendation, and I chose: e.g. the identity check, the "today" override, combining the delivery estimate with
   the customer's confirmation (my idea), the persona name, fictional partner stores that are only offered after
@@ -444,7 +455,10 @@ How I worked with it:
   manual ("30 dias corridos após a compra") and the code follows the manual.
 - **Testing with the real model surfaced real problems**, which we fixed in code rather than by editing transcripts:
   the agent inventing a "forwarding" step (→ ticket tool + prompt rule), a mixed-up date (→ explicit `starts_on`),
-  the free tier quota running out (→ model switch, clearer error logging), and a missing deadline plus an invented
-  condition caught by the scenario evaluation (→ prompt rules).
+  the free tier quota running out (→ model switch, fallback model, clearer error logging), a missing deadline plus an
+  invented condition caught by the scenario evaluation (→ prompt rules), a partial list presented as complete
+  (→ `more_available`), and recommendations not grounded in the data (→ prompt rule + evaluation scenario).
+- **A clean-clone test** following only the README found that `python` on my machine is 3.9, which breaks the
+  install; the README now creates the venv with Python 3.12 explicitly.
 
 The full log of what I asked the AI vs. what I decided is in [`docs/ai_usage_log.md`](docs/ai_usage_log.md).
