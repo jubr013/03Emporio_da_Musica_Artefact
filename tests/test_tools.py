@@ -42,6 +42,11 @@ def test_search_matches_word_starts_only():
     assert not any("Nylon" in p["name"] for p in results)
 
 
+def test_search_says_when_more_results_exist():
+    result = search_products(category_id=VIOLOES, max_price=1000, only_available=True)  # default limit = 10
+    assert (result["total"], result["showing"], result["more_available"]) == (12, 10, True)
+
+
 def test_search_without_results_says_so():
     result = search_products(query="pedal de distorção")
     assert result == {"found": False, "message": "Nenhum produto encontrado com esses critérios."}

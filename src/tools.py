@@ -149,7 +149,15 @@ def search_products(
     results.sort(key=lambda item: item["final_price_brl"])
     if not results:
         return {"found": False, "message": "Nenhum produto encontrado com esses critérios."}
-    return {"found": True, "total": len(results), "products": results[:limit]}
+    shown = results[:limit]
+    return {
+        "found": True,
+        "total": len(results),
+        "showing": len(shown),
+        # Explicit flag: without it the model once presented 10 of 12 results as the complete list
+        "more_available": len(results) > len(shown),
+        "products": shown,
+    }
 
 
 def get_product_details(product_id: int) -> dict:
