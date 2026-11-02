@@ -55,6 +55,17 @@ Decisions taken during development. They feed the "Design decisions" and "Assump
    the SDK's real types and check that tool results go back with the right id, API errors roll back the turn, and the
    round limit holds. No API key or quota needed.
 
+4. **Holidays.** Policy 2 says the store is closed on holidays, so `src/store_calendar.py` computes them (national and
+   MS state holidays from Campo Grande's decree nº 16.469/2025; municipal Santo Antônio 13/06 and city anniversary
+   26/08 from local calendars; Good Friday from Easter). Optional days such as Carnival and Corpus Christi are not
+   holidays. The prompt states whether today is a holiday and lists the next two weeks' holidays.
+5. **Identity attempt limit.** At most 3 failed order verifications per conversation; then lookups are blocked and
+   the customer is sent to the team. The counter lives in `Agent`, because the tool is stateless.
+6. **Scenario evaluation.** `scripts/evaluate_agent.py` runs 14 scripted messages against the real model and checks
+   tools called, key arguments and required/forbidden text. The first run (13/14) showed the agent omitting the
+   return deadline date and inventing an "inspection" condition; the prompt was fixed (not the test) and the next
+   run passed 14/14. Quota on my account (AI Studio, 2026-11-02): flash-lite 15 RPM / 500 RPD.
+
 ## Policy manual inconsistencies (resolved in `data/policies.md`)
 
 - Phone: (67) 3341-4444 used as landline, (67) 3321-4500 as WhatsApp (as section 7 names it).

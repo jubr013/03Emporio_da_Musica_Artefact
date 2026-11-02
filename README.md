@@ -20,7 +20,7 @@ melodIA: O Takamine GD20 Dreadnought Natural custa R$ 2.199,00. No PIX, ele sai 
 - [How it works](#how-it-works) · [Project structure](#project-structure)
 - [Design decisions](#design-decisions)
 - [Assumptions](#assumptions)
-- [Example conversations](#example-conversations)
+- [Example conversations](#example-conversations) · [Evaluation](#evaluation)
 - [Known limitations](#known-limitations) · [What I would do with more time](#what-i-would-do-with-more-time)
 - [Use of AI coding assistants](#use-of-ai-coding-assistants)
 
@@ -70,6 +70,13 @@ Run the tests (no API key needed: the tools are tested directly and the agent lo
 
 ```bash
 python -m pytest -q
+```
+
+Evaluate the agent against the real model (14 scripted scenarios, ~35 requests of the free quota; see
+[Evaluation](#evaluation)):
+
+```bash
+python scripts/evaluate_agent.py
 ```
 
 Environment variables (`.env`):
@@ -126,13 +133,16 @@ return policy).
 │   ├── prompts.py             # system prompt: melodIA persona, when to use each tool, store rules
 │   ├── tools.py               # data tools (products, orders, tickets) over pandas
 │   ├── policies.py            # policy lookup by topic
+│   ├── store_calendar.py      # holidays (store closed): national, MS state and Campo Grande
 │   └── data_loader.py         # loads and cleans the CSVs once
 ├── tests/                     # pytest: every tool, plus the agent loop with a fake model (no API calls)
 ├── examples/                  # 5 example conversations recorded from real runs
 ├── scripts/
+│   ├── evaluate_agent.py      # scripted scenarios against the real model -> docs/evaluation.md
 │   ├── check_gemini.py        # smoke test for the API key and model
 │   └── explore_data.py        # data exploration checks
 └── docs/
+    ├── evaluation.md          # latest evaluation report
     ├── data_exploration.md    # data quirks found and how each one is handled
     ├── decisions.md           # design decisions taken during development
     └── ai_usage_log.md        # what I asked the AI vs. what I decided
@@ -200,7 +210,10 @@ unsure. Key points:
   real way to register requests.
 - **Current date and time** are injected every turn, so the agent knows if the store is open (policy 7.1: outside
   business hours, tell the customer when the team is back). They use the **store's time zone**
-  (`America/Campo_Grande`, UTC-4), not the clock of whatever machine runs the agent.
+  (`America/Campo_Grande`, UTC-4), not the clock of whatever machine runs the agent. **Holidays** (store closed) are
+  computed in code (`src/store_calendar.py`: national, Mato Grosso do Sul and Campo Grande holidays, with Good Friday
+  derived from Easter) and the prompt says whether today is a holiday and which ones are coming in the next two weeks.
+  Optional days ("ponto facultativo", e.g. Carnival, Corpus Christi) are treated as regular days.
 - **Escalation:** complaints, unclear cases or anything needing a human decision → offer a support ticket
   (reply within 24 business hours) and the WhatsApp number.
 - **Out of scope:** the store sells instruments only. For accessories the agent explains this and **asks** if the
@@ -213,6 +226,9 @@ unsure. Key points:
 - "Order does not exist" and "contact does not match" return **the same message**, so nobody can discover which order
   numbers exist by trying numbers.
 - The tool returns only the customer's **first name** (enough for a greeting).
+- After **3 failed verifications** in the same conversation, order lookups are blocked and the customer is sent to the
+  team's WhatsApp, so contact details can't be guessed by trial and error. The counter lives in the agent (the
+  conversation), because the tool itself is stateless.
 
 ### Interface and conversation history
 
@@ -285,37 +301,62 @@ with a short context line in English; the conversation itself is in Portuguese.
 | [`04_return_outside_window.md`](examples/04_return_outside_window.md) | **Non-trivial:** wrong e-mail rejected, right phone accepted; window expired → legal warranty explained |
 | [`05_store_info_and_out_of_scope.md`](examples/05_store_info_and_out_of_scope.md) | Address and Saturday hours; accessory request (asks before suggesting partners); off-topic football question |
 
+## Evaluation
+
+Two layers of tests:
+
+1. **Unit tests (`python -m pytest -q`, 69 tests, no API key).** Every tool (search, prices and promotions, order
+   lookup and deadlines, tickets, policies, holidays, time zone) and the function-calling loop itself, using a fake
+   model built from the SDK's real types: tool results go back with the right id, API errors roll back the turn,
+   the round limit holds, order lookups are blocked after 3 failed verifications.
+2. **Scenario evaluation against the real model (`python scripts/evaluate_agent.py`).** 14 scripted customer
+   messages. For each one the script checks **which tools were called** (data vs. policy vs. none), key **tool
+   arguments** (e.g. the price filter), text that **must** appear (correct price, PIX price, deadline, tracking code)
+   and text that **must not** appear (a discount that isn't active, an invented price for a product the store doesn't
+   have, another customer's data, partner stores before the customer asks). The report goes to
+   [`docs/evaluation.md`](docs/evaluation.md).
+
+The first run passed 13/14: in the return scenario the agent applied the rule correctly but didn't say the deadline
+date and added a condition that is not in the policy ("after the product arrives and is inspected"). I fixed the
+prompt (always state the deadline; never add conditions the policy doesn't have), not the test, and the next run
+passed **14/14**. It is a single run of a non-deterministic model, so it shows the agent behaves as intended, not
+that it always will.
+
 ## Known limitations
 
-- **Free tier quotas.** `gemini-3.5-flash` allows 20 requests/day and each turn takes 2–3 requests. I did not confirm
-  the exact daily limit of `gemini-3.5-flash-lite`. The free tier also returns occasional 503 errors at peak times.
+- **Free tier quotas.** On my account's AI Studio rate-limit page (checked 2026-11-02), `gemini-3.5-flash-lite` allows
+  **15 requests/minute and 500/day**; `gemini-3.5-flash` (served as Gemini 3.6 Flash) only 5/minute and 20/day.
+  Each agent turn takes 2–3 requests, so the default model allows roughly 200 turns a day. Limits can differ per
+  account and change over time. The free tier also returns occasional 503 errors at peak times.
 - **LLM variability.** Even with tools and a low temperature, the lite model sometimes phrases things imprecisely
   (e.g. it occasionally says "o sistema" although the prompt asks it not to). Business rules are protected by
   computing them in code, but wording is not deterministic.
-- **No automated evaluation of the agent's answers.** There are 53 tests (every tool, plus the function-calling loop
-  with a fake model: tool results sent back, API errors rolled back, round limit), but what the real model *says*
-  was checked by running scenarios and reading the transcripts.
+- **The evaluation is small and string-based.** 14 scenarios, run once, checked with tool names and required /
+  forbidden text. It catches wrong tools, wrong numbers and leaks, but not tone or subtle wording problems, and a
+  different run of the model may give different results.
 - **Keyword search, not semantic search.** Every meaningful word of the query must start a word in the product's
   text. There is no typo tolerance and only the few normalizations described above; for anything else the model has
   to rephrase the query or filter by category.
 - **Support tickets are a local file** (`history/tickets.jsonl`), not a real helpdesk. Nobody actually receives them.
-- **Holidays are unknown:** opening hours follow Campo Grande's time zone, but the agent doesn't know which days are
-  holidays (when the store is closed).
+- **Holiday list is maintained by hand.** It covers national, MS state and Campo Grande holidays from official and
+  local calendars; a change in the law, or the store's "extended hours" on special dates (policy 2), would need an
+  update.
 - **Conversation history is saved but not reloaded:** each run starts a new conversation.
-- **Identity check is basic** (no limit on attempts, no one-time code).
+- **Identity check is basic:** order number + e-mail or phone, at most 3 failed attempts per conversation; there is
+  no one-time code, and a new conversation resets the counter.
 - **Policies were transcribed by hand:** if the manual changes, `data/policies.md` must be updated.
 
 ## What I would do with more time
 
-- **Evaluation set:** scripted scenarios (prices, promotions, returns, out of scope) run automatically against the
-  agent, with assertions on which tools were called plus an LLM-as-judge for tone and grounding.
+- **Stronger evaluation:** more scenarios (multi-turn ones included), several runs per scenario to measure pass rates,
+  an LLM-as-judge for tone and grounding, and running it in CI on every prompt change.
 - **Real channel:** WhatsApp or web chat integration, and tickets going to a real helpdesk with human handoff.
 - **Better search:** typo tolerance, a real synonym list, or embeddings if the catalog grows to the
   "300+ instruments" the manual mentions.
 - **Policies:** if the manual grew large or changed often, chunk it and use embeddings (RAG) instead of fixed topics.
 - **Data layer:** SQLite or a real database instead of CSVs, with real delivery dates and dated promotions.
-- **Operations:** structured logging of tool calls and latency, a holiday calendar, rate limiting for
-  identity checks, resuming conversations from `history/`.
+- **Operations:** structured logging of tool calls and latency, identity checks limited per customer rather than per
+  conversation, resuming conversations from `history/`.
 
 ## Use of AI coding assistants
 
@@ -339,6 +380,7 @@ How I worked with it:
   manual ("30 dias corridos após a compra") and the code follows the manual.
 - **Testing with the real model surfaced real problems**, which we fixed in code rather than by editing transcripts:
   the agent inventing a "forwarding" step (→ ticket tool + prompt rule), a mixed-up date (→ explicit `starts_on`),
-  and the free tier quota running out (→ model switch, clearer error logging).
+  the free tier quota running out (→ model switch, clearer error logging), and a missing deadline plus an invented
+  condition caught by the scenario evaluation (→ prompt rules).
 
 The full log of what I asked the AI vs. what I decided is in [`docs/ai_usage_log.md`](docs/ai_usage_log.md).

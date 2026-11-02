@@ -20,3 +20,5 @@ Running log for the README section "Use of coding assistants". Tool: Claude Code
 | 2026-11-02 | Draft the full README from `docs/` (decisions, data notes, this log) | Reviewed the content; assumptions and limitations reflect my choices |
 | 2026-11-02 | Suggest what to improve with the extra day, with cost and risk | Picked agent loop tests, store time zone and search improvements; skipped UI and RAG |
 | 2026-11-02 | Measure failing searches and fix them; tests caught "aço" matching "braço" | Fix only measured failures, keep keyword search |
+| 2026-11-02 | Review the known limitations and estimate which are worth fixing | Looked up the real quota in AI Studio myself; chose holidays, identity attempt limit and evaluation |
+| 2026-11-02 | Verify Campo Grande holidays on the web, write the calendar, attempt limit and evaluation script | First evaluation failed 1/14: fix the prompt, not the test |
