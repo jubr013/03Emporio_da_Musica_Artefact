@@ -7,3 +7,4 @@ google-genai>=2.0,<3
 tzdata>=2024.1
 # Tests
 pytest>=8.0
+pypdf>=4.0  # reads the original policy PDF to check the transcription
