@@ -27,9 +27,11 @@ class FakeModels:
     def __init__(self, script: list):
         self.script = list(script)
         self.requests = []
+        self.models_used = []
 
     def generate_content(self, model, contents, config):
         self.requests.append(list(contents))  # copy: the agent keeps appending to the same list
+        self.models_used.append(model)
         item = self.script.pop(0)
         if isinstance(item, Exception):
             raise item
@@ -143,3 +145,31 @@ def test_missing_contact_does_not_count_as_failed_attempt():
     for _ in range(4):
         agent.send("pedido 7")
     assert last_tool_result(agent)["verified"] is True
+
+
+QUOTA_EXHAUSTED = errors.ClientError(429, {"error": {"code": 429, "message": "quota", "status": "RESOURCE_EXHAUSTED"}})
+
+
+def test_switches_to_fallback_model_when_quota_is_exhausted(monkeypatch):
+    monkeypatch.setenv("GEMINI_FALLBACK_MODEL", "backup-model")
+    agent = make_agent([QUOTA_EXHAUSTED, text_response("Oi!"), text_response("Tudo certo.")])
+
+    assert agent.send("oi") == "Oi!"
+    assert agent.send("e aí?") == "Tudo certo."
+    # First call on the main model failed; the retry and the next turn used the fallback
+    assert agent.client.models.models_used == ["fake-model", "backup-model", "backup-model"]
+
+
+def test_quota_error_without_fallback_returns_fallback_answer(monkeypatch):
+    monkeypatch.setenv("GEMINI_FALLBACK_MODEL", "")
+    agent = make_agent([QUOTA_EXHAUSTED])
+    assert agent.send("oi") == FALLBACK_ANSWER
+    assert agent.history == []
+
+
+def test_other_client_errors_do_not_trigger_fallback(monkeypatch):
+    monkeypatch.setenv("GEMINI_FALLBACK_MODEL", "backup-model")
+    bad_request = errors.ClientError(400, {"error": {"code": 400, "message": "bad", "status": "INVALID_ARGUMENT"}})
+    agent = make_agent([bad_request])
+    assert agent.send("oi") == FALLBACK_ANSWER
+    assert agent.client.models.models_used == ["fake-model"]

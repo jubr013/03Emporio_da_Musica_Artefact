@@ -141,6 +141,8 @@ class Agent:
             retry_options=types.HttpRetryOptions(attempts=5, initial_delay=2, max_delay=20)
         ))
         self.model = model or os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+        # Used once if the main model's quota runs out (429). Has its own free quota. Empty value disables it.
+        self.fallback_model = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.1-flash-lite") or None
         self.history: list = []  # list of types.Content, the whole conversation
         self.on_tool_call = on_tool_call  # optional callback, e.g. to print tool calls in the CLI
         self.tool_declarations = types.Tool(function_declarations=_function_declarations())
@@ -167,8 +169,20 @@ class Agent:
             system_instruction=build_system_prompt(tools.now()),
             tools=[self.tool_declarations],
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
-            temperature=0.3,  # low: we want consistent, factual answers
+            temperature=0,  # customer service needs consistent, factual answers, not creative ones
         )
+
+    def _generate(self) -> types.GenerateContentResponse:
+        """Calls the model. If its quota is exhausted (429 even after the SDK's retries), switches to the fallback
+        model for the rest of the conversation and tries again once."""
+        try:
+            return self.client.models.generate_content(model=self.model, contents=self.history, config=self._config())
+        except errors.ClientError as error:
+            if error.code != 429 or not self.fallback_model or self.fallback_model == self.model:
+                raise
+            print(f"[quota exhausted for {self.model}, switching to {self.fallback_model}]", file=sys.stderr)
+            self.model = self.fallback_model
+            return self.client.models.generate_content(model=self.model, contents=self.history, config=self._config())
 
     def send(self, user_message: str) -> str:
         history_before = len(self.history)
@@ -186,9 +200,7 @@ class Agent:
         self.history.append(types.Content(role="user", parts=[types.Part(text=user_message)]))
 
         for _ in range(MAX_TOOL_ROUNDS):
-            response = self.client.models.generate_content(
-                model=self.model, contents=self.history, config=self._config()
-            )
+            response = self._generate()
             if not response.candidates or response.candidates[0].content is None:
                 return FALLBACK_ANSWER
             # Keep the model's turn exactly as returned (it may carry internal "thought signatures")
