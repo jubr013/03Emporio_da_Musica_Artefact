@@ -88,6 +88,18 @@ Decisions taken during development. They feed the "Design decisions" and "Assump
    order); holidays from a library (municipal holidays missing, extra dependency); reloading saved conversations and
    a real helpdesk (little value for a prototype).
 
+## Optional web UI (decided 2026-11-02)
+
+1. **Why:** the role is full-stack and React/TypeScript is my main stack. Built on a separate branch and merged only
+   after tests and my approval; the CLI stays the main interface.
+2. **Backend:** FastAPI (`src/api.py`) reusing the same `Agent`; one conversation per browser session in memory, one
+   request at a time (local, single user). The `today` field mirrors `--today`; without it the `.env` value is used.
+3. **Frontend:** Vite + React + TypeScript + Tailwind in `web/`, files written by hand (no generator) so every file is
+   understood. Vite forwards `/api` to the Python server, so no CORS setup. Under each answer the UI shows the tool
+   calls as labels (data / policy / ticket): it makes the agent's "when to consult what" decision visible.
+4. **Tests:** 12 API tests with the fake model, 11 frontend tests (Vitest + Testing Library, `fetch` mocked), and an
+   end-to-end check in the browser (return flow with ticket, mobile width, API down).
+
 ## Policy manual inconsistencies (resolved in `data/policies.md`)
 
 - Phone: (67) 3341-4444 used as landline, (67) 3321-4500 as WhatsApp (as section 7 names it).

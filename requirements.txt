@@ -5,6 +5,9 @@ python-dotenv>=1.0
 google-genai>=2.0,<3
 # Time zone database (Windows has none built in); used for the store's local time
 tzdata>=2024.1
+# Optional web UI backend (src/api.py)
+fastapi>=0.115,<1
+uvicorn>=0.30
 # Tests
 pytest>=8.0
 pypdf>=4.0  # reads the original policy PDF to check the transcription

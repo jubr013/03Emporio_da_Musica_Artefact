@@ -25,4 +25,6 @@ Running log for the README section "Use of coding assistants". Tool: Claude Code
 | 2026-11-02 | Re-record the 5 examples with the final prompt and review them | Re-record instead of keeping old ones; fix the partial-list and refund-start issues the review found |
 | 2026-11-02 | Go through every known limitation with cost, risk and a recommendation | Do: grounded recommendations, fallback model, multi-run evaluation, PDF check, model codes in search. Don't: per-order lock, holiday library, conversation reload, real helpdesk |
 | 2026-11-02 | AI argued against fuzzy search (the LLM already fixes typos) and against a per-order lock (lets anyone block someone else's order) | Accepted both: smaller search fix, lock left as a documented trade-off |
+| 2026-11-02 | Assess whether a React UI is worth it with the remaining time | Build it as an optional extra on a separate branch, local only, merged only after my approval |
+| 2026-11-02 | Write the FastAPI endpoint, the React/TS/Tailwind UI and their tests; test end to end in the browser | UI shows the agent's lookups as labels; simulated date field |
 | 2026-11-02 | Clean-clone test following only the README | `python` on my machine is 3.9, so the README now creates the venv with `py -3.12` / `python3.12` and says 3.9 doesn't work |
