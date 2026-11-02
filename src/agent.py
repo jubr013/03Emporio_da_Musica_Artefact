@@ -5,6 +5,7 @@ repeat until the model answers with text. The SDK's automatic function calling i
 so every step is explicit (see docs/decisions.md).
 """
 import os
+import sys
 from datetime import datetime
 from typing import Callable, Optional
 
@@ -133,7 +134,7 @@ class Agent:
         self.client = genai.Client(http_options=types.HttpOptions(
             retry_options=types.HttpRetryOptions(attempts=5, initial_delay=2, max_delay=20)
         ))
-        self.model = model or os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+        self.model = model or os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
         self.history: list = []  # list of types.Content, the whole conversation
         self.on_tool_call = on_tool_call  # optional callback, e.g. to print tool calls in the CLI
         self.tool_declarations = types.Tool(function_declarations=_function_declarations())
@@ -152,9 +153,11 @@ class Agent:
         history_before = len(self.history)
         try:
             return self._answer(user_message)
-        except errors.APIError:
-            # Model unavailable even after retries: undo this half-finished turn so the history stays
-            # consistent, and answer politely instead of crashing
+        except errors.APIError as error:
+            # Model unavailable even after retries (e.g. 503 high demand, 429 quota): undo this half-finished
+            # turn so the history stays consistent, and answer politely instead of crashing.
+            # The real reason goes to stderr for whoever runs the program, not to the customer.
+            print(f"[Gemini API error {error.code}] {error.status}: {str(error.message)[:200]}", file=sys.stderr)
             del self.history[history_before:]
             return FALLBACK_ANSWER
 

@@ -43,8 +43,9 @@ def test_delivered_inside_return_window():
     assert deadlines["receipt_date"] == "2026-02-17"
     assert deadlines["receipt_date_source"] == "estimated"
     assert deadlines["return_window_7_days_from_receipt"] == {
-        "deadline": "2026-02-24", "within_deadline": True, "days_left": 4,
+        "starts_on": "2026-02-17", "deadline": "2026-02-24", "within_deadline": True, "days_left": 4,
     }
+    assert deadlines["defect_exchange_30_days_from_purchase"]["starts_on"] == "2026-02-03"
     assert deadlines["defect_exchange_30_days_from_purchase"]["deadline"] == "2026-03-05"
 
 

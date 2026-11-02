@@ -168,7 +168,12 @@ def _identity_matches(customer: pd.Series, email: Optional[str], phone: Optional
 def _deadline(start: date, days: int) -> dict:
     deadline = start + timedelta(days=days)
     days_left = (deadline - today()).days
-    return {"deadline": deadline.isoformat(), "within_deadline": days_left >= 0, "days_left": max(days_left, 0)}
+    return {
+        "starts_on": start.isoformat(),  # explicit start date: without it the model once mixed it up with the deadline
+        "deadline": deadline.isoformat(),
+        "within_deadline": days_left >= 0,
+        "days_left": max(days_left, 0),
+    }
 
 
 def _deadlines(order: pd.Series, received_on: Optional[str]) -> dict:

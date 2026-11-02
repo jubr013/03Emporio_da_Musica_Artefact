@@ -37,6 +37,10 @@ Decisions taken during development. They feed the "Design decisions" and "Assump
    no way to do that. Added `create_support_ticket`, which writes the request to `history/tickets.jsonl` and returns
    a protocol number (the prototype's stand-in for the team's inbox). The prompt forbids claiming any action
    without calling the matching tool.
+6. **Default model: `gemini-3.5-flash-lite`.** `gemini-3.5-flash` was used first, but its free tier allows only
+   20 requests per day per model, and each agent turn takes 2–3 requests (tool call + answer). The quota ran out
+   while recording the examples. The lite model has its own quota, answered correctly in a test conversation
+   (tools, expired promotion, installments) and is faster. Switching back is one line in `.env`.
 5. **Model errors:** the free tier sometimes answers 503 (high demand). The client retries with exponential backoff;
    if it still fails, the agent answers with a polite fallback message and rolls back the unfinished turn.
 
