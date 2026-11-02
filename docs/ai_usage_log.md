@@ -14,3 +14,4 @@ Running log for the README section "Use of coding assistants". Tool: Claude Code
 | 2026-11-02 | Implement `get_order_status` from those decisions, with tests | Reviewed the deadline rules against the policy manual |
 | 2026-11-02 | Write the agent loop and system prompt; run real conversations against Gemini | Manual loop, persona name "melodIA", fictional partner stores offered only after asking the customer |
 | 2026-11-02 | AI flagged that the agent invented a "forwarding" step in a test conversation | Add a support-ticket tool instead of just telling the customer to call the store |
+| 2026-11-02 | Write the CLI (`src/main.py`) and the README run instructions | Save each conversation as JSON + Markdown so the example conversations come straight from real runs |
