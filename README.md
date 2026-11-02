@@ -95,6 +95,26 @@ Environment variables (`.env`):
 | `GEMINI_FALLBACK_MODEL` | `gemini-3.1-flash-lite` | Used automatically if the main model's daily quota runs out (empty disables it) |
 | `STORE_TODAY` | empty (real date) | Overrides "today" for deadline checks |
 
+### Optional: web UI
+
+A small React + TypeScript + Tailwind chat on top of the same agent, for local use. The CLI above is all the challenge
+needs; this is an extra. It shows, under each answer, **which lookups the agent made** (🔎 data, 📋 policy,
+📝 support ticket), and has a "Data simulada" field that does the same as `--today`.
+
+Requires Node.js 20.19+ (tested with 26.13). Run in two terminals, from the repo root:
+
+```bash
+# Terminal 1: Python API (same venv as above)
+python -m uvicorn src.api:app --port 8000
+
+# Terminal 2: web app
+cd web
+npm install
+npm run dev                     # then open http://localhost:5173
+```
+
+The web app forwards `/api` to the Python API (`web/vite.config.ts`). Frontend tests: `npm test` inside `web/`.
+
 ## How it works
 
 A single agent with **function calling**. Each customer message goes through a loop written by hand:
@@ -137,6 +157,7 @@ return policy).
 │   └── policies.md            # the manual transcribed to Markdown, one section per topic
 ├── src/
 │   ├── main.py                # CLI: chat loop, saves the conversation to history/
+│   ├── api.py                 # small FastAPI app for the optional web UI (same Agent)
 │   ├── agent.py               # function-calling loop, tool declarations, error handling
 │   ├── prompts.py             # system prompt: melodIA persona, when to use each tool, store rules
 │   ├── tools.py               # data tools (products, orders, tickets) over pandas
@@ -149,6 +170,7 @@ return policy).
 │   ├── evaluate_agent.py      # scripted scenarios against the real model -> docs/evaluation.md
 │   ├── check_gemini.py        # smoke test for the API key and model
 │   └── explore_data.py        # data exploration checks
+├── web/                       # optional React + TypeScript + Tailwind chat UI (Vite, Vitest)
 └── docs/
     ├── evaluation.md          # latest evaluation report
     ├── data_exploration.md    # data quirks found and how each one is handled
@@ -246,7 +268,11 @@ unsure. Key points:
 
 ### Interface and conversation history
 
-- **CLI**: the challenge focuses on the agent, not the UI.
+- **CLI** as the main interface: the challenge focuses on the agent, not the UI.
+- **Optional web UI** (`web/`), because the role is full-stack and React/TypeScript is my main stack. It is
+  deliberately thin: a FastAPI endpoint (`src/api.py`) reuses the same `Agent`, keeps one conversation per browser
+  session in memory and handles one request at a time (it's meant for local use by one person). The UI's main
+  feature is showing the agent's decisions, i.e. which data or policy lookups each answer is based on.
 - **History in memory** during the session (the model needs it to follow the conversation). When the chat ends, it
   is saved to `history/` as JSON (full, with tool results) and Markdown (readable). The example conversations come
   straight from these files.
@@ -322,8 +348,9 @@ with a short context line in English; the conversation itself is in Portuguese.
 
 Two layers of tests:
 
-1. **Unit tests (`python -m pytest -q`, 107 tests, no API key).** Every tool (search, prices and promotions, order
-   lookup and deadlines, tickets, policies, holidays, time zone), the policy transcription against the original PDF,
+1. **Unit tests (`python -m pytest -q`, 119 tests, no API key; plus 11 frontend tests with `npm test` in `web/`).**
+   Every tool (search, prices and promotions, order lookup and deadlines, tickets, policies, holidays, time zone), the
+   web API, the policy transcription against the original PDF,
    and the function-calling loop itself, using a fake model built from the SDK's real types: tool results go back
    with the right id, API errors roll back the turn, the round limit holds, order lookups are blocked after 3 failed
    verifications, and the fallback model takes over when the quota runs out.
@@ -386,7 +413,8 @@ as intended, not a guarantee that it always will.
   running it in CI on every prompt change.
 - **Answer self-check:** a second, cheap model call that checks each answer against the tool results before it is
   sent (catches unsupported claims), at the cost of double the requests and latency.
-- **Real channel:** WhatsApp or web chat integration, and tickets going to a real helpdesk with human handoff.
+- **Real channel:** WhatsApp integration or a deployed web chat (the current UI runs locally only), and tickets going
+  to a real helpdesk with human handoff.
 - **Better search:** typo tolerance, a real synonym list, or embeddings if the catalog grows to the
   "300+ instruments" the manual mentions.
 - **Policies:** if the manual grew large or changed often, chunk it and use embeddings (RAG) instead of fixed topics.
