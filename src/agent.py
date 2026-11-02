@@ -15,6 +15,12 @@ from src import policies, tools
 from src.prompts import build_system_prompt
 
 MAX_TOOL_ROUNDS = 6  # safety limit: stop if the model keeps asking for tools without answering
+MAX_IDENTITY_ATTEMPTS = 3  # failed order verifications allowed per conversation (LGPD: no guessing contact details)
+
+IDENTITY_BLOCKED_MESSAGE = (
+    "Limite de tentativas de verificação atingido nesta conversa. Não consulte mais pedidos aqui: "
+    "oriente o cliente a falar com a equipe pelo WhatsApp (67) 3321-4500."
+)
 
 FALLBACK_ANSWER = (
     "Desculpa, tive um problema para concluir sua consulta agora. "
@@ -138,6 +144,22 @@ class Agent:
         self.history: list = []  # list of types.Content, the whole conversation
         self.on_tool_call = on_tool_call  # optional callback, e.g. to print tool calls in the CLI
         self.tool_declarations = types.Tool(function_declarations=_function_declarations())
+        self.failed_identity_checks = 0  # wrong e-mail/phone attempts in this conversation
+
+    def _run_tool_with_limits(self, name: str, args: dict) -> dict:
+        """Runs a tool, enforcing per-conversation limits that a stateless tool can't track.
+
+        Order lookups: after MAX_IDENTITY_ATTEMPTS failed verifications (wrong e-mail/phone), further lookups are
+        refused for the rest of the conversation, so nobody can guess contact details by trial and error.
+        """
+        if name == "get_order_status" and self.failed_identity_checks >= MAX_IDENTITY_ATTEMPTS:
+            return {"verified": False, "blocked": True, "message": IDENTITY_BLOCKED_MESSAGE}
+
+        result = run_tool(name, args)
+        contact_given = args.get("email") or args.get("phone")
+        if name == "get_order_status" and contact_given and result.get("verified") is False:
+            self.failed_identity_checks += 1
+        return result
 
     def _config(self) -> types.GenerateContentConfig:
         # Rebuilt every turn so the prompt has the store's current date/time (date honours STORE_TODAY)
@@ -179,7 +201,7 @@ class Agent:
             result_parts = []
             for call in calls:
                 args = dict(call.args or {})
-                result = run_tool(call.name, args)
+                result = self._run_tool_with_limits(call.name, args)
                 if self.on_tool_call:
                     self.on_tool_call(call.name, args, result)
                 result_parts.append(types.Part(

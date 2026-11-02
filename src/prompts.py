@@ -2,7 +2,9 @@
 
 The prompt is in Portuguese because the agent talks to customers in pt-BR.
 """
-from datetime import datetime
+from datetime import date, datetime, timedelta
+
+from src.store_calendar import holiday_name, upcoming_holidays
 
 WEEKDAYS_PT = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"]
 
@@ -18,6 +20,7 @@ Você é a melodIA, assistente virtual da Empório da Música, loja de instrumen
 ## Contexto atual
 - Agora: {weekday}, {date} às {time}.
 - Horário de atendimento: segunda a sexta 09:00–18:00, sábado 09:00–13:00, domingo e feriados fechado.
+- {holidays}
 - Se a conversa acontecer fora do expediente, responda normalmente e avise quando a equipe humana volta a atender.
 
 ## Quando usar cada ferramenta
@@ -44,10 +47,14 @@ Você é a melodIA, assistente virtual da Empório da Música, loja de instrumen
 ## Regras de pedidos (privacidade/LGPD)
 - Para consultar um pedido, peça o número do pedido e o e-mail ou telefone usado na compra.
 - Se a ferramenta não verificar o cliente, não dê nenhum detalhe; peça para conferir os dados.
+- Se a ferramenta responder `blocked`, explique com gentileza que, por segurança, não é possível consultar o pedido
+  por aqui e indique o WhatsApp da equipe.
 - Nunca revele dados de outros clientes.
 
 ## Devoluções, trocas e garantia
 - Use os prazos calculados por `get_order_status` (campo `deadlines`); não calcule datas por conta própria.
+- Sempre diga a data limite (`deadline`) do prazo que se aplica, ex.: "você pode devolver até 24/02".
+- Não acrescente condições, etapas ou prazos que não estejam na política (ex.: inspeção, etiqueta, coleta).
 - A data de recebimento vem da PREVISÃO de entrega (não temos a data real). Diga "a previsão de entrega era
   DD/MM" e confirme com o cliente se recebeu por volta dessa data.
   Se ele informar outra data, chame `get_order_status` de novo com `received_on` (formato AAAA-MM-DD).
@@ -77,10 +84,23 @@ Você é a melodIA, assistente virtual da Empório da Música, loja de instrumen
 """
 
 
+def _holidays_line(today: date) -> str:
+    """Tells the model if today is a holiday and which holidays are coming, so it never says the store is open
+    on a day it is closed. Computed in code (src/store_calendar.py), not left to the model's memory."""
+    today_name = holiday_name(today)
+    upcoming = [f"{day:%d/%m} ({WEEKDAYS_PT[day.weekday()]}): {name}"
+                for day, name in upcoming_holidays(today + timedelta(days=1))]
+    line = f"HOJE É FERIADO ({today_name}): a loja está fechada." if today_name else "Hoje não é feriado."
+    if upcoming:
+        line += " Próximos feriados (loja fechada): " + "; ".join(upcoming) + "."
+    return line
+
+
 def build_system_prompt(now: datetime) -> str:
-    """Fills the current date/time so the model knows if the store is open."""
+    """Fills the current date/time and holidays so the model knows if the store is open."""
     return SYSTEM_PROMPT_TEMPLATE.format(
         weekday=WEEKDAYS_PT[now.weekday()],
         date=now.strftime("%d/%m/%Y"),
         time=now.strftime("%H:%M"),
+        holidays=_holidays_line(now.date()),
     )

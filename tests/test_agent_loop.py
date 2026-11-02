@@ -105,3 +105,41 @@ def test_run_tool_turns_exceptions_into_errors():
 def test_empty_model_response_returns_fallback():
     agent = make_agent([types.GenerateContentResponse(candidates=[])])
     assert agent.send("oi") == FALLBACK_ANSWER
+
+
+def order_lookup_turn(email: str, call_id: str) -> list:
+    """Script for one customer turn: the model asks for an order lookup, then answers with text."""
+    return [tool_call_response("get_order_status", {"order_id": 7, "email": email}, call_id), text_response("ok")]
+
+
+def last_tool_result(agent: Agent) -> dict:
+    return agent.history[-2].parts[0].function_response.response
+
+
+def test_order_lookups_blocked_after_three_failed_verifications():
+    script = []
+    for attempt in range(3):
+        script += order_lookup_turn(f"wrong{attempt}@x.com", f"bad-{attempt}")
+    script += order_lookup_turn("leticia.rocha@jmail.com", "right")  # correct e-mail, but too late
+    agent = make_agent(script)
+
+    for attempt in range(3):
+        agent.send("pedido 7")
+        assert last_tool_result(agent)["verified"] is False
+    agent.send("pedido 7, agora o e-mail certo")
+
+    result = last_tool_result(agent)
+    assert result["blocked"] is True
+    assert "customer_first_name" not in result  # nothing about the order leaks
+
+
+def test_missing_contact_does_not_count_as_failed_attempt():
+    script = []
+    for attempt in range(3):
+        script += [tool_call_response("get_order_status", {"order_id": 7}, f"no-contact-{attempt}"), text_response("ok")]
+    script += order_lookup_turn("leticia.rocha@jmail.com", "right")
+    agent = make_agent(script)
+
+    for _ in range(4):
+        agent.send("pedido 7")
+    assert last_tool_result(agent)["verified"] is True
