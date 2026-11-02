@@ -26,14 +26,17 @@ melodIA: O Takamine GD20 Dreadnought Natural custa R$ 2.199,00. No PIX, ele sai 
 
 ## Requirements
 
-- Python 3.12 (developed and tested with 3.12.10)
+- Python 3.12 (developed and tested with 3.12.10). Python 3.9 does **not** work: the `google-genai` 2.x SDK
+  doesn't support it.
 - A free Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey) (no credit card needed)
 
 ## How to run
 
 ```bash
-# 1. Create and activate a virtual environment
-python -m venv .venv
+# 1. Create and activate a virtual environment with Python 3.12
+#    (if `python --version` shows another version, create the venv with the launcher below)
+py -3.12 -m venv .venv          # Windows
+# python3.12 -m venv .venv      # macOS / Linux
 .venv\Scripts\activate          # Windows
 # source .venv/bin/activate     # macOS / Linux
 
@@ -59,6 +62,9 @@ CLI options:
 | `--today YYYY-MM-DD` | Pretends today is this date for return/warranty deadlines (same as `STORE_TODAY` in `.env`). The example conversations use `--today 2026-02-20` (see [Assumptions](#assumptions)) |
 
 Type `sair` (or press Ctrl+C) to end the chat. The conversation is saved to `history/` as JSON and Markdown.
+
+> If PowerShell refuses to run `activate` (execution policy), you can skip activation and call the venv's Python
+> directly: `.venv\Scripts\python -m src.main`.
 
 To reproduce the return scenarios of the examples:
 
