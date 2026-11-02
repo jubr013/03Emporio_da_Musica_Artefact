@@ -33,10 +33,29 @@ def normalize_text(text: str) -> str:
     return without_accents.lower().strip()
 
 
+# Words that carry no meaning in a product search ("violão DE aço ATÉ mil") and would only cut results.
+# "corda(s)" is here too: customers say "cordas de aço", but product texts rarely contain the word.
+SEARCH_STOPWORDS = {
+    "de", "da", "do", "das", "dos", "com", "sem", "para", "pra", "e", "o", "a", "os", "as", "um", "uma", "ate", "em",
+    "corda", "cordas",
+}
+
+
+def _join_model_code(match: re.Match) -> str:
+    letters = match.group(1)
+    return match.group(0) if letters in SEARCH_STOPWORDS else letters
+
+
 def search_form(text: str) -> str:
-    """Normalized text for keyword search: no accents, lowercase, and '-ões' plurals turned into '-ão'
-    ('violões' -> 'violao'), so singular and plural match. Regular '-s' plurals are handled by prefix matching."""
-    return re.sub(r"oes\b", "ao", normalize_text(text))
+    """Normalized text for keyword search, applied the same way to product texts and to queries:
+    - no accents, lowercase;
+    - '-ões' plurals -> '-ão' ('violões' -> 'violao'); regular '-s' plurals are handled by prefix matching;
+    - model codes glued together, so 'GD 20', 'GD-20' and 'GD20' all become 'gd20' ('AC-39' -> 'ac39').
+      Only short letter groups (up to 4) are glued, so 'violão 7 cordas' stays as it is.
+    """
+    text = re.sub(r"oes\b", "ao", normalize_text(text))
+    text = re.sub(r"\b([a-z]+)-(?=\d)", r"\1", text)
+    return re.sub(r"\b([a-z]{1,4})\s+(?=\d)", _join_model_code, text)
 
 
 def digits_only(text: str) -> str:

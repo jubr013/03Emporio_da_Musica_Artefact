@@ -14,7 +14,9 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from src.data_loader import StoreData, digits_only, load_store_data, normalize_text, search_form
+from src.data_loader import (
+    SEARCH_STOPWORDS, StoreData, digits_only, load_store_data, normalize_text, search_form,
+)
 
 PIX_DISCOUNT = 0.05  # policy 3: 5% off the list price, not applied on top of promotions
 
@@ -86,19 +88,13 @@ def _pricing(product: pd.Series) -> dict:
     }
 
 
-# Words that carry no meaning in a product search ("violão DE aço ATÉ mil") and would only cut results.
-# "corda(s)" is here too: customers say "cordas de aço", but product texts rarely contain the word.
-STOPWORDS = {
-    "de", "da", "do", "das", "dos", "com", "sem", "para", "pra", "e", "o", "a", "os", "as", "um", "uma", "ate", "em",
-    "corda", "cordas",
-}
 # Spelled-out numbers -> digits, as product names use digits ("7 Cordas")
 NUMBER_WORDS = {"quatro": "4", "cinco": "5", "seis": "6", "sete": "7", "doze": "12"}
 
 
 def _query_words(query: str) -> list:
     words = [NUMBER_WORDS.get(word, word) for word in search_form(query).split()]
-    return [word for word in words if word not in STOPWORDS]
+    return [word for word in words if word not in SEARCH_STOPWORDS]
 
 
 def _word_prefix_pattern(word: str) -> str:

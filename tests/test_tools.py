@@ -1,3 +1,5 @@
+import pytest
+
 from src.tools import get_product_details, search_products
 
 VIOLOES = 5
@@ -40,6 +42,21 @@ def test_search_matches_word_starts_only():
     results = search_products(query="violão cordas de aço", category_id=VIOLOES, limit=100)["products"]
     assert len(results) == 19
     assert not any("Nylon" in p["name"] for p in results)
+
+
+@pytest.mark.parametrize("query, product_id", [
+    ("Takamine GD 20", 95), ("takamine gd-20", 95), ("Takamine GD20", 95),
+    ("Tagima AC39", 83), ("tagima memphis ac 39", 83),
+    ("yamaha c 40", 81), ("Martin D28", 93),
+])
+def test_search_matches_model_codes_written_differently(query, product_id):
+    ids = [p["product_id"] for p in search_products(query=query, limit=100)["products"]]
+    assert product_id in ids
+
+
+def test_search_does_not_glue_long_words_to_numbers():
+    # "violão 7 cordas" must keep working: only short letter groups are glued to numbers
+    assert search_products(query="violão 7 cordas", limit=100)["total"] == 5
 
 
 def test_search_says_when_more_results_exist():
