@@ -39,12 +39,12 @@ export function Composer({ disabled, onSend }: ComposerProps) {
         onChange={(event) => setText(event.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Escreva sua mensagem…"
-        className="max-h-40 min-h-11 flex-1 resize-none rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-stone-800 shadow-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-200"
+        className="max-h-40 min-h-11 flex-1 resize-none rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-neutral-800 shadow-sm outline-none focus:border-red-600 focus:ring-2 focus:ring-red-100"
       />
       <button
         type="submit"
         disabled={!canSend}
-        className="h-11 rounded-xl bg-amber-700 px-5 font-medium text-white shadow-sm transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40"
+        className="h-11 rounded-xl bg-red-600 px-5 font-medium text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-neutral-300"
       >
         Enviar
       </button>

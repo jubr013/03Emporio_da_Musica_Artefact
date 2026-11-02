@@ -1,17 +1,18 @@
 import type { ToolCall } from "../api";
 import { toolLabel, type ToolKind } from "../toolLabels";
 
+// Kept within the palette (black, white, gray, red); the icon also tells the kinds apart
 const STYLES: Record<ToolKind, string> = {
-  data: "bg-sky-50 text-sky-800 ring-sky-200",
-  policy: "bg-emerald-50 text-emerald-800 ring-emerald-200",
-  action: "bg-violet-50 text-violet-800 ring-violet-200",
+  data: "bg-white text-neutral-800 ring-neutral-300",
+  policy: "bg-neutral-800 text-white ring-neutral-800",
+  action: "bg-red-50 text-red-700 ring-red-200",
 };
 
 const ICONS: Record<ToolKind, string> = { data: "🔎", policy: "📋", action: "📝" };
 
 export function ToolBadges({ calls }: { calls: ToolCall[] }) {
   if (calls.length === 0) {
-    return <p className="mt-2 text-xs text-stone-400">Respondeu sem consultar dados ou políticas</p>;
+    return <p className="mt-2 text-xs text-neutral-400">Respondeu sem consultar dados ou políticas</p>;
   }
   return (
     <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Consultas feitas pela melodIA">

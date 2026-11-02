@@ -14,7 +14,7 @@ export function MessageBubble({ message, showTools }: { message: ChatMessage; sh
   if (message.role === "customer") {
     return (
       <div className="flex justify-end">
-        <p className="max-w-[85%] rounded-2xl rounded-br-sm bg-amber-700 px-4 py-2.5 whitespace-pre-wrap text-white shadow-sm">
+        <p className="max-w-[85%] rounded-2xl rounded-br-sm bg-neutral-900 px-4 py-2.5 whitespace-pre-wrap text-white shadow-sm">
           {message.text}
         </p>
       </div>
@@ -31,11 +31,11 @@ export function MessageBubble({ message, showTools }: { message: ChatMessage; sh
 
   return (
     <div className="flex gap-3">
-      <span aria-hidden="true" className="mt-1 grid size-8 shrink-0 place-items-center rounded-full bg-amber-100 text-base">
+      <span aria-hidden="true" className="mt-1 grid size-8 shrink-0 place-items-center rounded-full bg-neutral-950 text-base ring-2 ring-red-600">
         🎸
       </span>
       <div className="max-w-[85%]">
-        <div className="answer rounded-2xl rounded-tl-sm bg-white px-4 py-3 text-stone-800 shadow-sm ring-1 ring-stone-200">
+        <div className="answer rounded-2xl rounded-tl-sm bg-white px-4 py-3 text-neutral-800 shadow-sm ring-1 ring-neutral-200">
           <Markdown>{message.text}</Markdown>
         </div>
         {showTools && message.toolCalls && <ToolBadges calls={message.toolCalls} />}

@@ -8,4 +8,4 @@ afterEach(() => {
 });
 
 // jsdom doesn't implement scrolling; the chat calls it to follow new messages
-Element.prototype.scrollIntoView = () => {};
+Element.prototype.scrollTo = () => {};
