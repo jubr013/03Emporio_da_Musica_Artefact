@@ -22,7 +22,7 @@ EXIT_WORDS = {"sair", "exit", "quit", "tchau"}
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Chat with melodIA, Empório da Música's assistant.")
-    parser.add_argument("--show-tools", action="store_true", help="print every tool call and its result")
+    parser.add_argument("--show-tools", action="store_true", help="print every tool call the agent makes")
     parser.add_argument("--today", help="date used for deadline checks (YYYY-MM-DD), overrides STORE_TODAY")
     return parser.parse_args()
 

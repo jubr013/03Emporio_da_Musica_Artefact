@@ -17,3 +17,4 @@ Running log for the README section "Use of coding assistants". Tool: Claude Code
 | 2026-11-02 | Write the CLI (`src/main.py`) and the README run instructions | Save each conversation as JSON + Markdown so the example conversations come straight from real runs |
 | 2026-11-02 | Run the 5 example scenarios through the real CLI, diagnose the 429 quota error, review each transcript | Switch to `gemini-3.5-flash-lite`; which scenarios to show |
 | 2026-11-02 | AI caught a wrong purchase date in one transcript and traced it to the tool output | Add `starts_on` to each deadline and re-record that conversation instead of editing it |
+| 2026-11-02 | Draft the full README from `docs/` (decisions, data notes, this log) | Reviewed the content; assumptions and limitations reflect my choices |
