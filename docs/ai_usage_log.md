@@ -12,3 +12,5 @@ Running log for the README section "Use of coding assistants". Tool: Claude Code
 | 2026-10-31 | Transcribe the policy PDF into `data/policies.md` (one section per topic) and write `get_policy` | No RAG/embeddings for 8 pages; how to resolve the manual's inconsistencies (phone, e-mail, installments) |
 | 2026-10-31 | Propose options for the order tool (today's date, identity check, receipt date, who computes deadlines) | All four choices; receipt date combining the estimate with the customer's confirmation was my idea (see `docs/decisions.md`) |
 | 2026-11-02 | Implement `get_order_status` from those decisions, with tests | Reviewed the deadline rules against the policy manual |
+| 2026-11-02 | Write the agent loop and system prompt; run real conversations against Gemini | Manual loop, persona name "melodIA", fictional partner stores offered only after asking the customer |
+| 2026-11-02 | AI flagged that the agent invented a "forwarding" step in a test conversation | Add a support-ticket tool instead of just telling the customer to call the store |
