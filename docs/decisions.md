@@ -186,6 +186,12 @@ prompt and is checked by the evaluation.
     professores"). Two more code fixes: prices go out pre-formatted (`price_display`), and `src/agent.py` checks each
     answer for forbidden phrases and asks the model for one rewrite (only the clean answer stays in the history).
     Final full run (27 scenarios × 1, the quota left for the day): **27/27**.
+19. **Last consistency review.** README and `.env.example` brought in line with the code (request estimates, where
+    each kind of answer comes from, `STORE_TODAY` with time, exit words, 50-conversation cap of the web API, the
+    evaluation's default date, rewrite asked only once). "Coming soon" products also get alternatives, which the
+    prompt now says too; a new scenario `coming_soon_product` failed once (price quoted, alternatives only offered),
+    so unavailable products carry an `availability_note` next to the alternatives; then 9/9 for the three
+    availability scenarios. A test now checks the delivery constants in code against `data/policies.md`.
 19. **Assumption made explicit:** `orders.csv` has no sales channel; every order has shipping data, so all orders are
    treated as online purchases (which is what makes the 7-day regret right apply).
 

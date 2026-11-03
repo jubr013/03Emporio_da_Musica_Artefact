@@ -62,7 +62,7 @@ CLI options:
 | `--show-tools` | Prints every tool call, so you can see when the agent looks up data or policies |
 | `--today YYYY-MM-DD` | Pretends today is this date for return/warranty deadlines (same as `STORE_TODAY` in `.env`). The example conversations use `--today 2026-02-20` (see [Assumptions](#assumptions)) |
 
-Type `sair` (or press Ctrl+C) to end the chat. The conversation is saved to `history/` as JSON and Markdown.
+Type `sair` (or `exit`, `quit`, `tchau`, or press Ctrl+C) to end the chat. The conversation is saved to `history/` as JSON and Markdown.
 
 > If PowerShell refuses to run `activate` (execution policy), you can skip activation and call the venv's Python
 > directly: `.venv\Scripts\python -m src.main`.
@@ -79,13 +79,17 @@ Run the tests (no API key needed: the tools are tested directly, the agent loop 
 python -m pytest -q
 ```
 
-Evaluate the agent against the real model (27 scripted scenarios, ~85 requests of the free quota per run; see
-[Evaluation](#evaluation)):
+Evaluate the agent against the real model (28 scripted scenarios; estimated 80–100 requests of the free quota per
+run, since each turn takes 2–3 requests and some scenarios have two messages; see [Evaluation](#evaluation)):
 
 ```bash
 python scripts/evaluate_agent.py            # 1 run
-python scripts/evaluate_agent.py --runs 3   # 3 runs per scenario, reports a pass rate (~120 requests)
+python scripts/evaluate_agent.py --runs 3   # 3 runs per scenario, reports a pass rate (~250–300 requests)
+python scripts/evaluate_agent.py --only price_lookup out_of_stock   # re-run a few scenarios
 ```
+
+The evaluation pretends today is **2026-02-20** (the same date as the example conversations), except in the scenarios
+that set their own date (e.g. the holiday and after-hours ones).
 
 Environment variables (`.env`):
 
@@ -128,7 +132,7 @@ customer message
       ▼
  Gemini (system prompt + conversation + tool declarations)
       │
-      ├── asks for tool(s) ──► Python runs them (pandas / policies file) ──► results go back to Gemini ──┐
+      ├── asks for tool(s) ──► Python runs them (pandas / rules in code / policies file) ──► results ──┐
       │                                                                                                    │
       │◄───────────────────────────────────────────────────────────────────────────────────────────────────┘
       │                                         (up to 6 rounds)
@@ -140,17 +144,24 @@ The tools the model can call:
 
 | Tool | Source | Used for |
 |---|---|---|
-| `search_products` | CSVs (pandas) | Catalog search by keywords, category, price range and availability. Returns list price, active promotion and PIX price |
-| `get_product_details` | CSVs (pandas) | Description, specs, stock, availability label and prices of one product |
+| `search_products` | CSVs (pandas) | Catalog search by keywords, category, price range and availability. Returns list price, active promotion, PIX price, installments and a ready-to-copy `price_display`; a specific product that is unavailable also comes with available alternatives |
+| `get_product_details` | CSVs (pandas) | Description, specs, stock, availability label, the same prices, and alternatives if it is unavailable |
 | `get_order_status` | CSVs (pandas) | Order status for a **verified** customer; for delivered orders, return/exchange/warranty deadlines computed in code |
 | `create_support_ticket` | `history/tickets.jsonl` | Registers a return, exchange, warranty request or complaint for the human team and returns a protocol number |
 | `get_delivery_info` | code (policy 5) | Shipping for the customer's city: local delivery in the Campo Grande region with the fee computed (free from R$ 500), or carriers and delivery times for other cities (price depends on the CEP, never invented) |
 | `get_policy` | `data/policies.md` | One section of the store policies: store info, hours, payment, returns, shipping, promotions, service, warranty, privacy, partner stores |
 
-**Data vs. policies:** facts that change (price, stock, order status) always come from the data tools; rules
-(how returns work, opening hours, payment conditions) always come from `get_policy`. The system prompt forbids
-answering either from memory. The examples show the agent combining both in one turn (e.g. order status +
-return policy).
+**Where each answer comes from:**
+- **Facts that change** (price, stock, order status) always come from the data tools.
+- **Rules with numbers or dates** are computed in code and returned ready by the tools: installments, delivery fee
+  and times, return/exchange/warranty deadlines, alternatives for unavailable products.
+- **Opening hours, holidays and "open now / next opening"** are computed in code and put in the system prompt every
+  turn, so questions like "are you open now?" are answered without a tool call.
+- **Everything else in the policies** (how returns work, payment methods, privacy, warranty coverage...) comes from
+  `get_policy`.
+
+The system prompt forbids answering any of these from memory. The examples show the agent combining data and
+policies in one turn (e.g. order status + return policy).
 
 ## Project structure
 
@@ -209,7 +220,7 @@ return policy).
 The problem is a small set of well-defined lookups (products, orders, policies), so the model only needs to pick
 the right tool and phrase the answer. Function calling fits that exactly. I did not use LangChain/LlamaIndex or a
 multi-agent setup: they would add abstractions without solving a real problem here, and a hand-written loop
-(~40 lines in `src/agent.py`) is easy to debug and explain. The SDK's automatic function calling is **disabled on
+(in `src/agent.py`) is easy to debug and explain. The SDK's automatic function calling is **disabled on
 purpose**, so every step (tool requested → executed → result returned) is explicit and loggable (`--show-tools`).
 
 ### Model and provider: Gemini free tier, `gemini-3.5-flash-lite`
@@ -258,8 +269,10 @@ ready-made values and the model only explains them:
   R$ 441,00 → 5x; only from R$ 1.200,00 does 12x work.
 - **Availability labels:** `disponivel`, `esgotado`, `descontinuado`, `em breve`, so the agent follows the policy
   for each case (suggest alternatives, offer equivalents, etc.).
-- **Alternatives for unavailable products:** an out-of-stock or discontinued product comes with up to 3 available
-  products of the same category (same string type and number of strings first, then the closest price). When the
+- **Alternatives for unavailable products:** an out-of-stock, discontinued or "coming soon" product comes with up to
+  3 available products of the same category (same string type and number of strings first, then the closest
+  price). `get_product_details` always adds them; `search_products` adds them only when the search returns 1 or 2
+  products (a specific model the customer named), since a broad search already lists what is available. When the
   prompt only told the model to look for alternatives, it listed guitars and prices that are not in the catalog.
 - **Deadlines:** for delivered orders, `get_order_status` returns the start date, deadline, whether it is still
   valid and the days left for the 7-day return window, the 7-day preference exchange, the 30-day defect exchange
@@ -425,7 +438,7 @@ with a short context line in English; the conversation itself is in Portuguese.
 
 Two layers of tests:
 
-1. **Unit tests (`python -m pytest -q`, 184 tests, no API key; plus 11 frontend tests with `npm test` in `web/`).**
+1. **Unit tests (`python -m pytest -q`, 188 tests, no API key; plus 11 frontend tests with `npm test` in `web/`).**
    Every tool (search, prices, installments, promotions, alternatives, delivery, order lookup and deadlines, tickets,
    policies, opening hours, holidays, time zone), the policy transcription against the original PDF, the web API, and
    the function-calling loop itself, using a fake model built from the SDK's real types: tool results go back with
@@ -433,7 +446,7 @@ Two layers of tests:
    after 3 failed verifications, tickets about an order need that order verified first, answers with forbidden
    phrases are rewritten once, and the fallback model takes over when the quota runs out. The frontend tests mock
    the API (messages, lookup labels, session, simulated date, errors).
-2. **Scenario evaluation against the real model (`python scripts/evaluate_agent.py`).** 27 scripted customer
+2. **Scenario evaluation against the real model (`python scripts/evaluate_agent.py`).** 28 scripted customer
    conversations, at least one per policy section. For each one the script checks **which tools were called** (data vs. policy vs. none), key **tool
    arguments** (e.g. the price filter), text that **must** appear (correct price, PIX price, deadline, tracking code)
    and text that **must not** appear (a discount that isn't active, an invented price for a product the store doesn't
@@ -465,7 +478,10 @@ alternatives for unavailable products are computed from the catalog, prices come
 and answers with forbidden phrases are sent back for one rewrite. A re-run of the 11 product scenarios × 3 then
 passed 30/33 (one dropped-cents price and one "queridinho dos professores", both fixed by the last two changes), and
 the **final full run passed 27/27** ([`docs/evaluation.md`](docs/evaluation.md)). The daily free quota allowed only
-one full run with the final code; that is good evidence, not a guarantee. The details are in
+one full run with the final code; that is good evidence, not a guarantee. A last review added a 28th scenario
+("coming soon" product): it failed once (the agent quoted the price and only *offered* alternatives), so unavailable
+products now also carry a short `availability_note` next to the alternatives; after that the three availability
+scenarios passed 9/9 ([`docs/evaluation_rerun.md`](docs/evaluation_rerun.md)). The details are in
 [`docs/decisions.md`](docs/decisions.md).
 
 ## Known limitations
@@ -477,12 +493,13 @@ one full run with the final code; that is good evidence, not a guarantee. The de
   over time. The free tier also returns occasional 503 errors at peak times (retried automatically).
 - **LLM variability.** Wording is not deterministic. During development the lite model said "o sistema" and added
   sales talk not in the data ("recommended by music teachers"); prompt rules, temperature 0, a code check that sends
-  answers with known bad phrases back for one rewrite, and evaluation scenarios now cover these, but a new kind of
-  unsupported phrase could still slip through. Business rules (prices, installments, deadlines, delivery,
+  answers with known bad phrases back for one rewrite, and evaluation scenarios now cover these. The rewrite is
+  asked only once (to avoid loops and extra cost): if the rewritten answer still has a forbidden phrase, it is sent
+  as is. A new kind of unsupported phrase, not in the list, can also slip through. Business rules (prices, installments, deadlines, delivery,
   alternatives, identity) don't depend on wording: they are computed in code.
   Example 02 shows one such slip: the agent offered to close the order, which it can't do. The final review caught
   it; a prompt rule and an evaluation scenario now cover it, and the transcript was kept as recorded.
-- **The evaluation is small and string-based.** 27 scenarios (the final code was run once in full), checked with tool names, key arguments and
+- **The evaluation is small and string-based.** 28 scenarios (the 27 original ones run once in full with the final code), checked with tool names, key arguments and
   required / forbidden text. It catches wrong tools, wrong numbers, leaks and known bad phrases, but not tone or new
   kinds of wording problems.
 - **Installments for several products together** are not computed in code: the model sums the prices and applies the
@@ -499,7 +516,8 @@ one full run with the final code; that is good evidence, not a guarantee. The de
   customers type) and `history/tickets.jsonl` keeps the contact of each ticket. The folder is git-ignored, but there is
   no masking or retention period; in production contacts would be masked in logs and kept only as long as needed.
 - **The web UI is a local extra:** one person, one request at a time, conversations kept in the API's memory (lost
-  when it restarts and not saved to `history/`), no authentication, no deployment.
+  when it restarts and not saved to `history/`; at most 50 kept, the oldest is dropped), no authentication, no
+  deployment. If the API restarts mid-conversation, the next message starts a new conversation on the server.
 - **Identity check is basic:** order number + e-mail or phone, at most 3 failed attempts per conversation; there is
   no one-time code, and a new conversation resets the counter. I deliberately did not lock the **order** after failed
   attempts: anyone could then block another customer's order just by typing wrong e-mails. In a real channel the
