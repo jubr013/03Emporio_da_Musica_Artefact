@@ -162,20 +162,38 @@ return policy).
 ├── src/
 │   ├── main.py                # CLI: chat loop, saves the conversation to history/
 │   ├── api.py                 # small FastAPI app for the optional web UI (same Agent)
-│   ├── agent.py               # function-calling loop, tool declarations, error handling
-│   ├── prompts.py             # system prompt: melodIA persona, when to use each tool, store rules
-│   ├── tools.py               # data tools (products, orders, tickets) over pandas
+│   ├── agent.py               # function-calling loop, tool declarations, per-conversation limits (identity,
+│   │                          # tickets), forbidden-phrase check, error handling and fallback model
+│   ├── prompts.py             # system prompt: melodIA persona, service flow, when to use each tool, store rules
+│   ├── tools.py               # data tools over pandas: products (prices, installments, alternatives), delivery,
+│   │                          # orders and deadlines, support tickets
 │   ├── policies.py            # policy lookup by topic
-│   ├── store_calendar.py      # holidays (store closed): national, MS state and Campo Grande
+│   ├── store_calendar.py      # opening hours, open now / next opening, holidays (national, MS, Campo Grande)
 │   └── data_loader.py         # loads and cleans the CSVs once
-├── tests/                     # pytest: every tool, the agent loop and the web API with a fake model (no API
-│                              # calls), and the policy transcription checked against the original PDF
+├── tests/                     # pytest, no API calls
+│   ├── fake_model.py          # scripted fake Gemini client built from the SDK's real types
+│   ├── test_agent_loop.py     # the loop: tool results, rollbacks, limits, rewrites, fallback model
+│   ├── test_api.py            # web API (FastAPI) with the fake model
+│   ├── test_tools.py          # search, prices, installments, alternatives
+│   ├── test_delivery_tool.py  # local region vs. other cities, free delivery from R$ 500
+│   ├── test_order_tool.py     # identity check and deadlines
+│   ├── test_ticket_tool.py    # support tickets
+│   ├── test_policies*.py      # policy lookup; transcription checked against the original PDF
+│   ├── test_store_*.py        # opening hours, holidays, store time zone
+│   └── test_data_loader.py    # CSV loading and cleaning
 ├── examples/                  # 5 example conversations recorded from real runs
 ├── scripts/
 │   ├── evaluate_agent.py      # scripted scenarios against the real model -> docs/evaluation.md
 │   ├── check_gemini.py        # smoke test for the API key and model
 │   └── explore_data.py        # data exploration checks
-├── web/                       # optional React + TypeScript + Tailwind chat UI (Vite, Vitest)
+├── web/                       # optional chat UI: React + TypeScript + Tailwind (Vite, Vitest)
+│   ├── vite.config.ts         # dev server; forwards /api to the Python API on port 8000
+│   └── src/
+│       ├── App.tsx            # chat screen: messages, simulated date, new conversation
+│       ├── api.ts             # client for src/api.py
+│       ├── toolLabels.ts      # turns tool calls into labels (data / policy / action) shown under each answer
+│       ├── components/        # Composer (input), MessageBubble (Markdown answer), ToolBadges, TypingIndicator
+│       └── *.test.ts(x)       # Vitest + Testing Library, API mocked
 └── docs/
     ├── evaluation.md          # latest full evaluation report
     ├── evaluation_rerun.md    # latest partial re-run (--only)
@@ -341,8 +359,10 @@ The challenge says to make reasonable assumptions when something is ambiguous. T
   delivery.
 - **Shipping to other cities** has no price in the data: it depends on the CEP, weight and dimensions. The agent
   gives carriers and delivery times, never a price or free shipping, and says the team quotes it.
-- **After the 30-day defect exchange** the warranty goes through the manufacturer, and the store can intermediate on
-  request (policy 4.2): the agent offers a `garantia` ticket for that.
+- **Defects follow three periods.** Policy 4.2 says that after the 30-day defect exchange the customer goes to the
+  manufacturer, but policy 8.1 also gives a 90-day legal warranty from receipt. Both are applied, in order: up to 30
+  days from purchase, exchange at the store; up to 90 days from receipt, legal warranty; after that, the
+  manufacturer's warranty, which the store can intermediate on request (the agent offers a `garantia` ticket).
 
 **Policy manual inconsistencies**
 - Phone: the company data labels (67) 3341-4444 as "Telefone / WhatsApp", while the customer service section names
