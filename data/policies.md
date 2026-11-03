@@ -2,6 +2,8 @@
 Transcription of data/politicas_da_loja.pdf (Manual de Políticas e Procedimentos v2.1, June 2025).
 One "## " section per topic; src/policies.py splits the file on these headings.
 Section 10 (internal notes for staff) was left out on purpose: it is not customer-facing.
+"Mais de 300 instrumentos" (section 1) was also left out on purpose: the catalog data has 65 products, so the agent
+should not promise a variety it can't show.
 -->
 
 ## sobre_a_loja
@@ -10,7 +12,7 @@ A Empório da Música é uma loja especializada em instrumentos musicais, fundad
 
 O catálogo abrange instrumentos de marcas nacionais e internacionais, incluindo guitarras, baixos, violões, baterias, teclados, instrumentos de sopro, cordas orquestrais e ukuleles. A loja trabalha **exclusivamente com instrumentos musicais** — não comercializa acessórios como cordas, palhetas, cabos, cases, pedais ou amplificadores.
 
-Missão: democratizar o acesso a instrumentos musicais de qualidade na região Centro-Oeste, oferecendo atendimento especializado e preços competitivos.
+Missão: democratizar o acesso a instrumentos musicais de qualidade na região Centro-Oeste, oferecendo atendimento especializado e preços competitivos, contribuindo para o desenvolvimento cultural e musical da comunidade.
 
 | Campo | Informação |
 |---|---|
@@ -18,8 +20,8 @@ Missão: democratizar o acesso a instrumentos musicais de qualidade na região C
 | Nome Fantasia | Empório da Música |
 | CNPJ | 12.345.678/0001-90 |
 | Endereço | Rua 14 de Maio, 3200 — Centro, Campo Grande - MS, CEP 79202-333 |
-| Telefone | (67) 3341-4444 |
-| WhatsApp | (67) 3321-4500 |
+| Telefone / WhatsApp (geral) | (67) 3341-4444 |
+| WhatsApp de atendimento | (67) 3321-4500 |
 | E-mail | contato@emporiodamusica.com.br |
 | Fundação | 2008 |
 
@@ -47,7 +49,7 @@ Formas de pagamento aceitas para compras presenciais e online:
 | Boleto Bancário | Pagamento à vista | Compensação em até 3 dias úteis |
 
 Regras de parcelamento (cartão de crédito):
-- Até 3x: sem juros, sem valor mínimo de parcela (exceto compras abaixo de R$ 50,00).
+- Até 3x: sem juros, sem valor mínimo de parcela (exceto abaixo de R$ 50,00).
 - De 4x a 6x: sem juros, parcela mínima de R$ 80,00.
 - De 7x a 12x: sem juros, parcela mínima de R$ 100,00.
 - Combinação de formas de pagamento (ex.: PIX + cartão): permitida para compras acima de R$ 2.000,00.
@@ -70,7 +72,7 @@ Trocas por defeito:
 - Danos causados por mau uso, quedas, exposição a umidade excessiva ou modificações não autorizadas não são cobertos.
 
 Trocas por preferência (cor, modelo, tamanho):
-- Permitidas em até 7 dias, mediante disponibilidade do produto desejado.
+- Permitidas em até 7 dias, mediante disponibilidade do produto desejado. (Assumido: 7 dias corridos após o recebimento do produto, como no arrependimento; o manual não diz a partir de quando.)
 - O produto deve estar em perfeito estado e na embalagem original.
 - Diferenças de valor são cobradas ou reembolsadas conforme o caso.
 
@@ -82,6 +84,7 @@ Itens não elegíveis para troca:
 ## frete_e_entregas
 
 Região metropolitana de Campo Grande:
+(Assumido: Campo Grande não tem região metropolitana instituída por lei; vale a Região Geográfica Imediata de Campo Grande do IBGE: Bandeirantes, Camapuã, Campo Grande, Corguinho, Dois Irmãos do Buriti, Jaraguari, Nova Alvorada do Sul, Ribas do Rio Pardo, Rio Negro, Rochedo, São Gabriel do Oeste, Sidrolândia e Terenos. Pedido de exatamente R$ 500,00 também tem frete grátis.)
 - Frete grátis para pedidos acima de R$ 500,00.
 - Pedidos abaixo de R$ 500,00: taxa fixa de R$ 35,00.
 - Prazo de entrega: 1 a 3 dias úteis.

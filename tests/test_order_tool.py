@@ -47,6 +47,15 @@ def test_delivered_inside_return_window():
     }
     assert deadlines["defect_exchange_30_days_from_purchase"]["starts_on"] == "2026-02-03"
     assert deadlines["defect_exchange_30_days_from_purchase"]["deadline"] == "2026-03-05"
+    # Preference exchange: 7 calendar days from receipt, like the regret window
+    assert deadlines["preference_exchange_7_days_from_receipt"] == {
+        "starts_on": "2026-02-17", "deadline": "2026-02-24", "within_deadline": True, "days_left": 4,
+    }
+
+
+def test_preference_exchange_expired_outside_window():
+    deadlines = get_order_status(6, email=GABRIEL_EMAIL)["deadlines"]
+    assert deadlines["preference_exchange_7_days_from_receipt"]["within_deadline"] is False
 
 
 def test_delivered_outside_return_window_but_under_warranty():

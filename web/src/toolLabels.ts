@@ -29,6 +29,8 @@ export function toolLabel({ name, args }: ToolCall): ToolLabel {
       return { kind: "data", text: `Consultou o produto #${args.product_id}` };
     case "get_order_status":
       return { kind: "data", text: `Consultou o pedido #${args.order_id}` };
+    case "get_delivery_info":
+      return { kind: "data", text: `Consultou o frete para ${args.city}` };
     case "get_policy": {
       const topic = String(args.topic ?? "");
       return { kind: "policy", text: `Política: ${POLICY_TOPICS[topic] ?? topic}` };

@@ -17,6 +17,13 @@ def test_store_today_overrides_only_the_date(monkeypatch):
     assert tools.today() == date(2026, 2, 20)
 
 
+def test_store_today_with_time_overrides_date_and_time(monkeypatch):
+    monkeypatch.setenv("STORE_TODAY", "2026-11-07T14:30")
+    current = tools.now()
+    assert (current.date(), current.hour, current.minute) == (date(2026, 11, 7), 14, 30)
+    assert current.utcoffset() == timedelta(hours=-4)
+
+
 def test_system_prompt_shows_weekday_and_date(monkeypatch):
     monkeypatch.setenv("STORE_TODAY", "2026-02-20")  # a Friday
     prompt = build_system_prompt(tools.now())

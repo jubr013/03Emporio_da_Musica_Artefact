@@ -2,9 +2,11 @@
 
 The fake returns scripted responses built with the SDK's real types, so the agent code runs exactly as in production.
 """
+import pytest
 from google.genai import errors, types
 
-from src.agent import FALLBACK_ANSWER, MAX_TOOL_ROUNDS, Agent, run_tool
+from src import tools
+from src.agent import FALLBACK_ANSWER, MAX_TOOL_ROUNDS, Agent, forbidden_phrases, run_tool
 from tests.fake_model import make_agent, text_response, tool_call_response
 
 
@@ -54,6 +56,39 @@ def test_stops_after_max_tool_rounds():
     agent = make_agent(script)
     assert agent.send("?") == FALLBACK_ANSWER
     assert len(agent.client.models.requests) == MAX_TOOL_ROUNDS
+    assert agent.history == []  # no dangling tool results left for the next turn
+
+
+def test_answer_with_unsupported_claim_is_rewritten_once():
+    agent = make_agent([
+        text_response("O Yamaha C40 é o queridinho dos professores!"),
+        text_response("O Yamaha C40 é indicado para iniciantes na descrição."),
+    ])
+    assert agent.send("qual violão para iniciante?") == "O Yamaha C40 é indicado para iniciantes na descrição."
+    # The rewrite request names the problem and is not sent as if the customer wrote it
+    rewrite_request = agent.client.models.requests[1][-1].parts[0].text
+    assert "Revisão automática" in rewrite_request and "queridinho" in rewrite_request
+    # Only the customer's message and the clean answer stay in the history
+    assert [content.role for content in agent.history] == ["user", "model"]
+    assert agent.history[-1].parts[0].text == "O Yamaha C40 é indicado para iniciantes na descrição."
+
+
+def test_rewrite_is_asked_only_once():
+    agent = make_agent([text_response("Vi no sistema que sim."), text_response("Vi no sistema, de novo.")])
+    assert agent.send("tem?") == "Vi no sistema, de novo."  # second attempt is kept: no endless loop
+    assert len(agent.client.models.requests) == 2
+
+
+@pytest.mark.parametrize("text, flagged", [
+    ("Ele tem sistema de captação Fishman.", False),
+    ("O sistema de captação dele é ótimo.", False),
+    ("Consultei aqui e está disponível.", False),
+    ("Vi no sistema que está disponível.", True),
+    ("É o mais vendido da loja!", True),
+    ("Segundo o manual interno...", True),
+])
+def test_forbidden_phrases(text, flagged):
+    assert bool(forbidden_phrases(text)) is flagged
 
 
 def test_run_tool_reports_unknown_tool():
@@ -68,6 +103,16 @@ def test_run_tool_turns_exceptions_into_errors():
 def test_empty_model_response_returns_fallback():
     agent = make_agent([types.GenerateContentResponse(candidates=[])])
     assert agent.send("oi") == FALLBACK_ANSWER
+    assert agent.history == []  # the unanswered message is not left in the history
+
+
+def test_empty_text_answer_rolls_back_the_turn():
+    agent = make_agent([text_response("Oi!"), text_response("")])
+    agent.send("oi")
+    history_after_first_turn = list(agent.history)
+
+    assert agent.send("tudo bem?") == FALLBACK_ANSWER
+    assert agent.history == history_after_first_turn
 
 
 def order_lookup_turn(email: str, call_id: str) -> list:
@@ -108,7 +153,41 @@ def test_missing_contact_does_not_count_as_failed_attempt():
     assert last_tool_result(agent)["verified"] is True
 
 
-QUOTA_EXHAUSTED = errors.ClientError(429, {"error": {"code": 429, "message": "quota", "status": "RESOURCE_EXHAUSTED"}})
+def ticket_turn(order_id, call_id: str) -> list:
+    """Script for one customer turn: the model asks to open a return ticket for an order, then answers."""
+    args = {"request_type": "devolucao", "summary": "Cliente quer devolver", "order_id": order_id}
+    return [tool_call_response("create_support_ticket", args, call_id), text_response("ok")]
+
+
+def test_ticket_for_an_unverified_order_is_refused(tmp_path, monkeypatch):
+    monkeypatch.setattr(tools, "TICKETS_FILE", tmp_path / "tickets.jsonl")
+    agent = make_agent(ticket_turn(7, "t1"))
+    agent.send("quero devolver o pedido 7")
+
+    assert last_tool_result(agent)["created"] is False
+    assert not tools.TICKETS_FILE.exists()
+
+
+def test_ticket_for_a_verified_order_is_created(tmp_path, monkeypatch):
+    monkeypatch.setattr(tools, "TICKETS_FILE", tmp_path / "tickets.jsonl")
+    # The model may send the order number as a float; it still matches the verified order
+    agent = make_agent(order_lookup_turn("leticia.rocha@jmail.com", "lookup") + ticket_turn(7.0, "t1"))
+    agent.send("pedido 7, leticia.rocha@jmail.com")
+    agent.send("quero devolver")
+
+    assert last_tool_result(agent)["created"] is True
+
+
+def test_ticket_without_an_order_does_not_need_verification(tmp_path, monkeypatch):
+    monkeypatch.setattr(tools, "TICKETS_FILE", tmp_path / "tickets.jsonl")
+    args = {"request_type": "reclamacao", "summary": "Atendimento demorado"}
+    agent = make_agent([tool_call_response("create_support_ticket", args), text_response("ok")])
+    agent.send("quero reclamar do atendimento")
+
+    assert last_tool_result(agent)["created"] is True
+
+
+QUOTA_EXHAUSTED =errors.ClientError(429, {"error": {"code": 429, "message": "quota", "status": "RESOURCE_EXHAUSTED"}})
 
 
 def test_switches_to_fallback_model_when_quota_is_exhausted(monkeypatch):

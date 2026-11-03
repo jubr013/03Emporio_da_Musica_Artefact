@@ -5,6 +5,7 @@ repeat until the model answers with text. The SDK's automatic function calling i
 so every step is explicit (see docs/decisions.md).
 """
 import os
+import re
 import sys
 from typing import Callable, Optional
 
@@ -12,6 +13,7 @@ from google import genai
 from google.genai import errors, types
 
 from src import policies, tools
+from src.data_loader import normalize_text
 from src.prompts import build_system_prompt
 
 MAX_TOOL_ROUNDS = 6  # safety limit: stop if the model keeps asking for tools without answering
@@ -20,6 +22,28 @@ MAX_IDENTITY_ATTEMPTS = 3  # failed order verifications allowed per conversation
 IDENTITY_BLOCKED_MESSAGE = (
     "Limite de tentativas de verificação atingido nesta conversa. Não consulte mais pedidos aqui: "
     "oriente o cliente a falar com a equipe pelo WhatsApp (67) 3321-4500."
+)
+
+UNVERIFIED_ORDER_TICKET_MESSAGE = (
+    "Solicitação não registrada: o pedido informado não foi verificado nesta conversa. Antes, confirme o pedido "
+    "com get_order_status (número do pedido + e-mail ou telefone usado na compra)."
+)
+
+# Claims the product data never supports and internal wording the customer shouldn't see. The prompt forbids them,
+# but the model still slipped now and then ("queridinho dos professores"), so answers are checked in code.
+# "sistema" alone is fine ("sistema de captação" is in product descriptions); "o/no/nosso sistema" is internal talk.
+FORBIDDEN_IN_ANSWERS = {
+    r"professor": "opiniões atribuídas a professores",
+    r"mais vendid": "\"mais vendido\" (não temos dados de vendas)",
+    r"queridinh": "\"queridinho\" (afirmação sem base nos dados)",
+    r"ferramenta": "a palavra \"ferramenta\"",
+    r"manual interno": "\"manual interno\"",
+    r"\b(?:o|no|nosso) sistema\b(?! de)": "\"o sistema\" (fale \"consultei aqui\")",
+}
+
+REWRITE_REQUEST = (
+    "[Revisão automática, não é mensagem do cliente] Reescreva sua última resposta ao cliente sem: {problems}. "
+    "Mantenha as mesmas informações, preços e tom; mude só esses trechos."
 )
 
 FALLBACK_ANSWER = (
@@ -98,6 +122,22 @@ def _function_declarations() -> list:
             },
         ),
         types.FunctionDeclaration(
+            name="get_delivery_info",
+            description=(
+                "Frete e prazo de entrega para a cidade do cliente. Diz se a cidade tem entrega local (motoboy, "
+                "frete grátis a partir de R$ 500) e calcula a taxa; para outras cidades, retorna modalidades e prazos "
+                "(o valor depende do CEP e não é informado aqui)."
+            ),
+            parameters_json_schema={
+                "type": "object",
+                "properties": {
+                    "city": {"type": "string", "description": "Cidade de entrega informada pelo cliente."},
+                    "order_total_brl": {"type": "number", "description": "Preço final do que o cliente quer comprar (some se forem vários)."},
+                },
+                "required": ["city"],
+            },
+        ),
+        types.FunctionDeclaration(
             name="get_policy",
             description="Texto da política da loja sobre um tópico.",
             parameters_json_schema={
@@ -115,6 +155,7 @@ TOOL_FUNCTIONS: dict = {
     "get_product_details": tools.get_product_details,
     "get_order_status": tools.get_order_status,
     "create_support_ticket": tools.create_support_ticket,
+    "get_delivery_info": tools.get_delivery_info,
     "get_policy": policies.get_policy,
 }
 
@@ -128,6 +169,20 @@ def run_tool(name: str, args: dict) -> dict:
         return function(**args)
     except Exception as error:  # noqa: BLE001 - any tool failure is reported back to the model
         return {"error": f"Falha ao executar {name}: {error}"}
+
+
+def forbidden_phrases(text: str) -> list:
+    """Descriptions of the forbidden phrases found in an answer (accents and case ignored)."""
+    normalized = normalize_text(text)
+    return [description for pattern, description in FORBIDDEN_IN_ANSWERS.items() if re.search(pattern, normalized)]
+
+
+def _as_order_id(value) -> Optional[int]:
+    """The model may send the order number as 7, 7.0 or "7"; anything else is not a valid order id."""
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
 
 
 class Agent:
@@ -147,20 +202,29 @@ class Agent:
         self.on_tool_call = on_tool_call  # optional callback, e.g. to print tool calls in the CLI
         self.tool_declarations = types.Tool(function_declarations=_function_declarations())
         self.failed_identity_checks = 0  # wrong e-mail/phone attempts in this conversation
+        self.verified_orders: set = set()  # order ids whose owner was verified in this conversation
 
     def _run_tool_with_limits(self, name: str, args: dict) -> dict:
         """Runs a tool, enforcing per-conversation limits that a stateless tool can't track.
 
         Order lookups: after MAX_IDENTITY_ATTEMPTS failed verifications (wrong e-mail/phone), further lookups are
         refused for the rest of the conversation, so nobody can guess contact details by trial and error.
+        Tickets about an order: only for an order verified in this conversation, so nobody can open a return or
+        complaint on someone else's order.
         """
         if name == "get_order_status" and self.failed_identity_checks >= MAX_IDENTITY_ATTEMPTS:
             return {"verified": False, "blocked": True, "message": IDENTITY_BLOCKED_MESSAGE}
+        if name == "create_support_ticket" and args.get("order_id") is not None:
+            if _as_order_id(args["order_id"]) not in self.verified_orders:
+                return {"created": False, "message": UNVERIFIED_ORDER_TICKET_MESSAGE}
 
         result = run_tool(name, args)
-        contact_given = args.get("email") or args.get("phone")
-        if name == "get_order_status" and contact_given and result.get("verified") is False:
-            self.failed_identity_checks += 1
+        if name == "get_order_status":
+            contact_given = args.get("email") or args.get("phone")
+            if contact_given and result.get("verified") is False:
+                self.failed_identity_checks += 1
+            elif result.get("verified") is True:
+                self.verified_orders.add(result["order_id"])
         return result
 
     def _config(self) -> types.GenerateContentConfig:
@@ -187,28 +251,44 @@ class Agent:
     def send(self, user_message: str) -> str:
         history_before = len(self.history)
         try:
-            return self._answer(user_message)
+            answer = self._answer(user_message)
         except errors.APIError as error:
-            # Model unavailable even after retries (e.g. 503 high demand, 429 quota): undo this half-finished
-            # turn so the history stays consistent, and answer politely instead of crashing.
+            # Model unavailable even after retries (e.g. 503 high demand, 429 quota).
             # The real reason goes to stderr for whoever runs the program, not to the customer.
             print(f"[Gemini API error {error.code}] {error.status}: {str(error.message)[:200]}", file=sys.stderr)
+            answer = None
+        if answer is None:
+            # No usable answer (API error, empty response, tool round limit): undo this half-finished turn so the
+            # history doesn't end on an unanswered message or tool result, and answer politely instead of crashing.
             del self.history[history_before:]
             return FALLBACK_ANSWER
+        return answer
 
-    def _answer(self, user_message: str) -> str:
+    def _answer(self, user_message: str) -> Optional[str]:
+        """Runs one turn. Returns the answer text, or None if the turn produced no usable answer."""
         self.history.append(types.Content(role="user", parts=[types.Part(text=user_message)]))
+        rewrite_at = None  # history index of an answer sent back for rewriting (only once per turn)
 
         for _ in range(MAX_TOOL_ROUNDS):
             response = self._generate()
             if not response.candidates or response.candidates[0].content is None:
-                return FALLBACK_ANSWER
+                return None
             # Keep the model's turn exactly as returned (it may carry internal "thought signatures")
             self.history.append(response.candidates[0].content)
 
             calls = response.function_calls
             if not calls:
-                return response.text or FALLBACK_ANSWER
+                text = response.text or None
+                problems = forbidden_phrases(text or "")
+                if text and problems and rewrite_at is None:
+                    # Ask for one rewrite; the bad answer and this request are removed once it arrives
+                    rewrite_at = len(self.history) - 1
+                    request = REWRITE_REQUEST.format(problems="; ".join(problems))
+                    self.history.append(types.Content(role="user", parts=[types.Part(text=request)]))
+                    continue
+                if rewrite_at is not None:
+                    del self.history[rewrite_at:rewrite_at + 2]
+                return text
 
             result_parts = []
             for call in calls:
@@ -222,4 +302,4 @@ class Agent:
             # Tool results go back to the model as the next message in the conversation
             self.history.append(types.Content(role="user", parts=result_parts))
 
-        return FALLBACK_ANSWER
+        return None

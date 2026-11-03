@@ -12,6 +12,10 @@ describe("toolLabel", () => {
     expect(toolLabel({ name: "get_order_status", args: { order_id: 7, email: "x@y.com" } }).text).toBe(
       "Consultou o pedido #7",
     );
+    expect(toolLabel({ name: "get_delivery_info", args: { city: "Dourados" } })).toEqual({
+      kind: "data",
+      text: "Consultou o frete para Dourados",
+    });
   });
 
   it("labels policy lookups with a readable topic", () => {
