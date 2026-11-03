@@ -28,3 +28,7 @@ Running log for the README section "Use of coding assistants". Tool: Claude Code
 | 2026-11-02 | Assess whether a React UI is worth it with the remaining time | Build it as an optional extra on a separate branch, local only, merged only after my approval |
 | 2026-11-02 | Write the FastAPI endpoint, the React/TS/Tailwind UI and their tests; test end to end in the browser | UI shows the agent's lookups as labels; simulated date field |
 | 2026-11-02 | Clean-clone test following only the README | `python` on my machine is 3.9, so the README now creates the venv with `py -3.12` / `python3.12` and says 3.9 doesn't work |
+| 2026-11-03 | Review the repo against the e-mail, the challenge and the job description | Fix the gaps found (fake "close the order" offer, tickets on unverified orders, history rollback) |
+| 2026-11-03 | I went through the policy manual section by section; for each one the AI said what was covered, where, and what was missing | Decided each point: hours/next opening, installments, preference exchange (7 days from receipt), metro region = IBGE immediate region, free delivery from R$ 500,00 inclusive, warranty, privacy requests |
+| 2026-11-03 | Ask if the Correios API could quote shipping | Not used: needs a Correios contract and the products have no weight/dimensions; documented as future work |
+| 2026-11-03 | Full evaluation failed 73/81; a prompt-only fix made the agent invent products | Move alternatives, price formatting and a forbidden-phrase check into code; final full run 27/27 |

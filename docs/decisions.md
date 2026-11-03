@@ -100,8 +100,101 @@ Decisions taken during development. They feed the "Design decisions" and "Assump
 4. **Tests:** 12 API tests with the fake model, 11 frontend tests (Vitest + Testing Library, `fetch` mocked), and an
    end-to-end check in the browser (return flow with ticket, mobile width, API down).
 
+## Review before submission (decided 2026-11-03)
+
+A last review against the challenge found two cases of the agent going beyond what it should, plus two loop edge
+cases. Same principle as before: enforce in code what a tool makes enforceable; what is only wording goes in the
+prompt and is checked by the evaluation.
+
+1. **Tickets on unverified orders (code).** `create_support_ticket` could be called with any order number, so someone
+   could open a return or complaint on another customer's order. The agent now remembers which orders were verified
+   in the conversation and refuses a ticket tied to any other order (tickets without an order, e.g. a general
+   complaint, still work). The prompt also tells the model to verify the order first.
+2. **Offering to close a sale (prompt + evaluation).** Example 02 ended with "Quer fechar o pedido por aqui?", but the
+   agent has no way to create orders. There is no tool to block, so this is a prompt rule (no orders, reservations or
+   closing sales; send the customer to WhatsApp or the store) and a new evaluation scenario (`no_order_placement`).
+   Example 02 was kept as recorded and is flagged in the README instead of being edited.
+3. **History rollback.** An empty model response or hitting the tool round limit left the history ending on an
+   unanswered message or on tool results. Those turns are now rolled back like API errors.
+4. **Campaign calendar is not a discount (prompt + evaluation).** Policy 6.1 lists when campaigns usually happen
+   (e.g. Black Friday in November, 15–30% "em todo o catálogo"), but every Black Friday row in `promotions.csv` is
+   inactive. In November the model could read the calendar as an active discount. The data wins (policy 7.3: check
+   that the promotion is active): the prompt says the calendar only describes when campaigns usually happen, and a
+   new scenario (`campaign_month_no_promise`, today = 2026-11-03) fails if a Black Friday price is computed.
+5. **Opening hours in code.** "When is the team back?" was left to the model (Saturday afternoon → Monday; eve of
+   a holiday → the day after). `src/store_calendar.py` now has the weekly hours (`OPENING_HOURS`), `is_open` and
+   `next_opening` (skips Sundays and holidays); the prompt gets "open now / next opening" every turn and its hours
+   line is generated from the same table. A test checks the table against the `horarios` section of
+   `data/policies.md`, so the two can't drift apart. `STORE_TODAY` also accepts `YYYY-MM-DDTHH:MM` so the evaluation
+   can simulate a time (scenario `after_hours_next_opening`, Saturday 14:00).
+6. **Extended hours (policy 2).** The agent doesn't know if or when hours are extended on special dates, so it
+   must not confirm them; it says changes are announced on social media and WhatsApp.
+7. **Installments in code.** The model worked out the maximum installments from the policy text, which needs the
+   per-range minimums (R$ 349,90 → 4x; 7x only from R$ 700). `credit_card_installments` in `src/tools.py` computes
+   it on the final price and every product result carries `credit_card` (`max_installments`, `installment_brl`).
+   Several products together are still summed by the model (documented limitation). Scenario
+   `installments_for_cheap_product` checks the cheapest product (3x of R$ 53,30).
+8. **"Exceto abaixo de R$ 50,00" (policy 3.1, up to 3x).** The first transcription silently turned it into "purchases
+   below R$ 50". It now keeps the manual's words, and the code reads it as a R$ 50 minimum installment (the
+   sentence is about the installment value). No current product is affected by the difference.
+9. **Preference exchange (policy 4.3).** Not computed before: the model would reuse the regret deadline without
+   saying so. Now `preference_exchange_7_days_from_receipt` is computed in code (7 calendar days after receipt, my
+   reading of "em até 7 dias", documented in `data/policies.md`), and the prompt requires checking the desired
+   product's stock first. Scenario `preference_exchange`.
+10. **Items not eligible (policy 4.4).** Nothing in the data says if an order had setup/customization or was a
+    "venda final" sale, so the agent can't decide. It mentions the exclusions, asks, notes the answer in the ticket,
+    and the team confirms. Mouthpieces only if asked (no wind instruments in the catalog).
+11. **Intermediation after 30 days (policy 4.2).** The prompt now has the agent offer a `garantia` ticket so the
+    store intermediates with the manufacturer, as the policy allows on request.
+12. **Shipping tool (policy 5).** 26 of 50 customers live outside Campo Grande, and nothing stopped the model from
+    applying "free above R$ 500" to them. New tool `get_delivery_info(city, order_total_brl)`: decides in code if the
+    city is in the local region (IBGE Região Geográfica Imediata de Campo Grande, since there is no legal
+    metropolitan region) and computes the fee (free from R$ 500,00 inclusive, else R$ 35); other cities get PAC /
+    SEDEX / Jadlog times and no price. The prompt makes the agent ask the city first, warn that large instruments may
+    need a special quote, and explain tracking for orders not yet shipped and what to do on damage. Scenarios
+    `shipping_other_city` and `shipping_local_free`.
+13. **Correios API: not used.** Price/deadline APIs need a Correios contract (CWS token) and the products have no
+    weight/dimensions; documented under "What I would do with more time".
+14. **No rain check (policy 6.2).** If a product on promotion is out of stock, the agent says the promotion depends on
+    stock and the promotional price is not held for when it comes back. Prompt only: no current promoted product is
+    out of stock.
+15. **Service flow and special situations (policy 7).** The prompt now spells out the 5-step flow of 7.2 (greet by
+    name only if known, never asking the name just for that; close by asking if anything else is needed) and a
+    complaint section (empathy, then register the ticket once the customer agrees). New scenarios:
+    `discontinued_product` and `complaint_registered`; `out_of_stock` and `discontinued_product` require a second
+    lookup (`min_calls`), since suggesting alternatives needs one.
+16. **Warranty (policy 8).** No product has a manufacturer warranty term in the data, so the agent never states one
+    (only the legal 90 days and "see the certificate"); it never decides if a concrete damage is covered (the team
+    assesses, via a `garantia` ticket); and the prompt spells out the order for defects: 30 days from purchase
+    (exchange), 90 days from receipt (legal warranty), then the manufacturer. Scenarios `manufacturer_warranty` and
+    `warranty_coverage_not_decided`.
+17. **Privacy requests (policy 9).** Data deletion needs the team to confirm the requester's identity, so the agent
+    points to WhatsApp / e-mail and never claims it deleted data; marketing consent is also handled by the team.
+    Scenario `data_deletion_request`. Local logs (`history/`) holding personal data are documented as a limitation
+    (masking would make them useless as example sources).
+18. **Alternatives computed in code (found by the evaluation).** The full run with all the changes above passed
+    73/81: the agent offered to look for alternatives instead of suggesting them (policy 7.3), mentioned "no rain
+    check" for a product without promotion, copied a PIX price without the cents once, and one check of
+    `no_order_placement` matched a correct refusal ("não consigo fechar o pedido"). A prompt rule to "suggest
+    alternatives in the same answer" made it worse: with a single search, the model listed guitars that don't exist
+    (e.g. "Giannini GN-14", "Takamine GD20-NS" at R$ 3.490). Final fix: `get_product_details` and specific searches
+    return `available_alternatives` for unavailable products (same category; same strings and number of strings
+    first; closest price), the prompt only lets the model cite products and prices returned in the conversation,
+    the rain-check warning only when there is a promotion, prices copied with cents. The scenarios now require one
+    of the computed alternatives and forbid the invented names; the `no_order_placement` check forbids offers only.
+    Re-run of the 11 product scenarios × 3: 30/33 (once "R$ 429,00" for R$ 429,90, once "queridinho dos
+    professores"). Two more code fixes: prices go out pre-formatted (`price_display`), and `src/agent.py` checks each
+    answer for forbidden phrases and asks the model for one rewrite (only the clean answer stays in the history).
+    Final full run (27 scenarios × 1, the quota left for the day): **27/27**.
+19. **Assumption made explicit:** `orders.csv` has no sales channel; every order has shipping data, so all orders are
+   treated as online purchases (which is what makes the 7-day regret right apply).
+
 ## Policy manual inconsistencies (resolved in `data/policies.md`)
 
-- Phone: (67) 3341-4444 used as landline, (67) 3321-4500 as WhatsApp (as section 7 names it).
+- Phone: (67) 3341-4444 kept as the general "Telefone / WhatsApp" (section 1.2's label); (67) 3321-4500 as the
+  customer service WhatsApp (section 7), the one the agent gives. First transcribed as landline vs. WhatsApp, which
+  dropped the manual's label; corrected in the review of 2026-11-03.
+- "Mais de 300 instrumentos" left out: the catalog data has 65 products.
+- Mission: transcribed in full (the first version had cut its last clause).
 - E-mail: `contato@emporiodamusica.com.br` (the accented variant is treated as a typo).
 - Credit card minimum installment: the detailed ranges of section 3.1 prevail over the summary table.
