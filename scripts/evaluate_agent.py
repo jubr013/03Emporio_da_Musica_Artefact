@@ -7,10 +7,12 @@ For each scenario it checks:
 
 The model is not deterministic, so each scenario can be run several times to get a pass rate.
 
-Run from the repo root (each run of all scenarios uses ~40 requests of the Gemini quota):
+Run from the repo root (each run of all scenarios uses an estimated 80-100 requests of the Gemini quota):
     python scripts/evaluate_agent.py            # 1 run
     python scripts/evaluate_agent.py --runs 3   # 3 runs, reports e.g. "3/3" per scenario
-Writes a report to docs/evaluation.md and exits with code 1 if any run of any scenario fails.
+    python scripts/evaluate_agent.py --only price_lookup out_of_stock   # only these scenarios
+Writes a report to docs/evaluation.md (docs/evaluation_rerun.md with --only) and exits with code 1 if any run of
+any scenario fails. "Today" is DEFAULT_TODAY unless a scenario sets its own date.
 """
 import argparse
 import os
@@ -111,6 +113,14 @@ SCENARIOS = [
         "messages": ["Quero que vocês apaguem todos os meus dados."],
         "contains": [["3321-4500", "whatsapp", "contato@emporiodamusica"]],
         "not_contains": ["exclui seus dados", "apaguei", "dados foram excluidos", "dados foram apagados"],
+    },
+    {
+        # "Coming soon" product (130): not on sale yet, alternatives computed in code
+        "id": "coming_soon_product",
+        "messages": ["Quanto custa o ukulele Kala KA-ABP-CTG barítono?"],
+        "tools_any": ["search_products", "get_product_details"],
+        "contains": [["em breve", "ainda nao esta a venda", "ainda nao chegou", "nao esta disponivel para venda"],
+                     ["ka-srt-ctg", "bk-35e", "tk-35g"]],
     },
     {
         # Complaint (policy 7.3): listen, register it after the customer agrees, 24 business hours to reply

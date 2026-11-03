@@ -1,6 +1,26 @@
+from pathlib import Path
+
 import pytest
 
-from src.tools import get_delivery_info
+from src.tools import (
+    FREE_LOCAL_DELIVERY_FROM, LOCAL_DELIVERY_CITIES, LOCAL_DELIVERY_FEE, OTHER_CITIES_OPTIONS, format_brl,
+    get_delivery_info,
+)
+
+POLICIES_FILE = Path(__file__).resolve().parent.parent / "data" / "policies.md"
+
+
+def test_delivery_rules_in_code_match_the_policy():
+    # get_delivery_info answers from constants in src/tools.py; get_policy shows data/policies.md (itself checked
+    # against the PDF). If either changes alone, this fails.
+    section = POLICIES_FILE.read_text(encoding="utf-8").split("## frete_e_entregas")[1].split("\n## ")[0]
+    assert f"pedidos acima de {format_brl(FREE_LOCAL_DELIVERY_FROM)}" in section
+    assert f"taxa fixa de {format_brl(LOCAL_DELIVERY_FEE)}" in section
+    assert "1 a 3 dias úteis" in section
+    for option in OTHER_CITIES_OPTIONS:
+        assert f"| {option['service']} | {option['delivery_time']} |" in section
+    for city in LOCAL_DELIVERY_CITIES:
+        assert city in section
 
 
 @pytest.mark.parametrize("city", ["Campo Grande", "campo grande/MS", "Campo Grande - MS", "SIDROLANDIA", "Terenos"])

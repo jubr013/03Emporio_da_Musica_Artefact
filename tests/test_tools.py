@@ -144,7 +144,15 @@ def test_discontinued_7_string_gets_7_string_alternatives():
 
 
 def test_available_product_has_no_alternatives_field():
-    assert "available_alternatives" not in get_product_details(95)
+    details = get_product_details(95)
+    assert "available_alternatives" not in details and "availability_note" not in details
+
+
+@pytest.mark.parametrize("product_id, start", [(96, "Esgotado"), (113, "Descontinuado"), (130, "Em breve")])
+def test_unavailable_products_carry_a_note_and_alternatives(product_id, start):
+    details = get_product_details(product_id)
+    assert details["availability_note"].startswith(start)
+    assert len(details["available_alternatives"]) == 3
 
 
 def test_search_for_a_specific_unavailable_product_includes_alternatives():

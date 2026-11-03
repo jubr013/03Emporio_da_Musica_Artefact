@@ -196,6 +196,7 @@ def search_products(
     for item in shown:
         row = item.pop("_row")
         if len(shown) <= 2 and item["availability"] != "disponivel":
+            item["availability_note"] = UNAVAILABLE_NOTES[item["availability"]]
             item["available_alternatives"] = _available_alternatives(row)
     return {
         "found": True,
@@ -205,6 +206,17 @@ def search_products(
         "more_available": len(results) > len(shown),
         "products": shown,
     }
+
+
+# Next to the alternatives, so the model reads what the label means for the customer where it uses the data.
+# In one run it gave the price of a "coming soon" product and only offered alternatives, with the rule only in the
+# prompt.
+_SHOW_ALTERNATIVES = "Mostre ao cliente as opções de available_alternatives (nome e price_display)."
+UNAVAILABLE_NOTES = {
+    "esgotado": "Esgotado: temporariamente indisponível. " + _SHOW_ALTERNATIVES,
+    "descontinuado": "Descontinuado: saiu do catálogo. " + _SHOW_ALTERNATIVES,
+    "em breve": "Em breve: ainda não está à venda, não ofereça o preço como compra possível. " + _SHOW_ALTERNATIVES,
+}
 
 
 def _similarity_key(product: pd.Series, candidate: pd.Series) -> tuple:
@@ -257,6 +269,7 @@ def get_product_details(product_id: int) -> dict:
         **_pricing(product),
     }
     if availability != "disponivel":
+        details["availability_note"] = UNAVAILABLE_NOTES[availability]
         details["available_alternatives"] = _available_alternatives(product)
     return details
 
